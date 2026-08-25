@@ -1,0 +1,30 @@
+{
+  "name": "cetect-flow",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "@eslint/js": "latest",
+    "@types/d3": "^7.4.3",
+    "@vitejs/plugin-react": "latest",
+    "d3": "^7.9.0",
+    "eslint": "latest",
+    "eslint-plugin-react-hooks": "latest",
+    "eslint-plugin-react-refresh": "latest",
+    "globals": "latest",
+    "react": "latest",
+    "react-dom": "latest",
+    "typescript": "latest",
+    "typescript-eslint": "latest",
+    "vite": "latest"
+  },
+  "devDependencies": {
+    "@types/react": "latest",
+    "@types/react-dom": "latest"
+  }
+}

@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Painel ARED 2027.1 — Monitoramento de Evasão</title>
+<style>
+:root {
+  --bg: #f5f0e8;
+  --surface: #fffcf7;
+  --surface2: #faf6ef;
+  --border: rgba(180,155,110,0.25);
+  --border-strong: rgba(180,155,110,0.45);
+  --text: #1e1710;
+  --muted: #7a6a55;
+  --hint: #a8987f;
+  --red: #9f2b1a;
+  --red-bg: #fdf0ee;
+  --red-border: rgba(159,43,26,0.22);
+  --amber: #a06300;
+  --amber-bg: #fdf5e6;
+  --amber-border: rgba(160,99,0,0.22);
+  --green: #3a6b43;
+  --green-bg: #eef5ef;
+  --green-border: rgba(58,107,67,0.22);
+  --slate: #546070;
+  --slate-bg: #eef1f4;
+  --slate-border: rgba(84,96,112,0.22);
+  --radius: 14px;
+  --radius-sm: 8px;
+  --shadow: 0 2px 16px rgba(90,60,20,0.07);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: "Segoe UI", system-ui, Arial, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: 230px 1fr;
+  min-height: 100vh;
+}
+
+/* SIDEBAR */
+.sidebar {
+  background: var(--surface);
+  border-right: 1px solid var(--border-strong);
+  padding: 24px 0;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.sidebar-logo {
+  padding: 0 20px 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.sidebar-logo .logo-label {
+  font-size: 10px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--hint);
+  margin-bottom: 4px;
+}
+
+.sidebar-logo h1 {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.3;
+}
+
+.sidebar-logo .semester {
+  font-size: 13px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+.sidebar-section {
+  padding: 14px 20px 8px;
+}
+
+.sidebar-section-title {
+  font-size: 10px;
+  letter-spacing: 1.8px;
+  text-transform: uppercase;
+  color: var(--hint);
+  margin-bottom: 8px;
+}
+
+.filter-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--muted);
+  transition: all 0.15s;
+  border: 1px solid transparent;
+}
+
+.filter-item:hover {
+  background: var(--surface2);
+  color: var(--text);
+}
+
+.filter-item.active {
+  background: #fdf6ed;
+  border-color: rgba(160,99,0,0.3);
+  color: #7a4a00;
+  font-weight: 600;
+}
+
+.filter-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--border-strong);
+  flex-shrink: 0;
+}
+
+.filter-item.active .filter-dot {
+  background: var(--amber);
+}
+
+.filter-count {
+  margin-left: auto;
+  font-size: 11px;
+  background: var(--surface2);
+  border-radius: 99px;
+  padding: 1px 7px;
+  color: var(--hint);
+  font-weight: 500;
+}
+
+.filter-item.active .filter-count {
+  background: rgba(160,99,0,0.12);
+  color: var(--amber);
+}
+
+/* MAIN */
+.main {
+  padding: 28px 28px 48px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* HEADER HERO */
+.hero {
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  padding: 24px 28px;
+  box-shadow: var(--shadow);
+}
+
+.hero-top {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 20px;
+  align-items: start;
+}
+
+.eyebrow {
+  font-size: 11px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--hint);
+  margin-bottom: 8px;
+}
+
+.hero h2 {
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--text);
+  line-height: 1.1;
+  letter-spacing: -0.5px;
+}
+
+.hero-regional {
+  margin-top: 8px;
+  font-size: 15px;
+  color: var(--muted);
+}
+
+.hero-regional strong {
+  color: var(--text);
+}
+
+.alert-badge {
+  text-align: center;
+  background: var(--red-bg);
+  border: 1px solid var(--red-border);
+  border-radius: var(--radius);
+  padding: 16px 22px;
+  min-width: 160px;
+}
+
+.alert-badge .badge-label {
+  font-size: 11px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--red);
+  opacity: 0.8;
+}
+
+.alert-badge .badge-num {
+  font-size: 52px;
+  font-weight: 900;
+  color: var(--red);
+  line-height: 1;
+  margin: 6px 0 4px;
+}
+
+.alert-badge .badge-sub {
+  font-size: 12px;
+  color: var(--red);
+  opacity: 0.7;
+}
+
+/* KPI GRID */
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.kpi-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 14px 16px 16px;
+}
+
+.kpi-card.kpi-red { border-top: 3px solid var(--red); }
+.kpi-card.kpi-amber { border-top: 3px solid var(--amber); }
+.kpi-card.kpi-green { border-top: 3px solid var(--green); }
+.kpi-card.kpi-slate { border-top: 3px solid var(--slate); }
+
+.kpi-label {
+  font-size: 11px;
+  letter-spacing: 1.3px;
+  text-transform: uppercase;
+  color: var(--hint);
+}
+
+.kpi-num {
+  font-size: 34px;
+  font-weight: 800;
+  line-height: 1.1;
+  margin: 8px 0 4px;
+}
+
+.kpi-red .kpi-num { color: var(--red); }
+.kpi-amber .kpi-num { color: var(--amber); }
+.kpi-green .kpi-num { color: var(--green); }
+.kpi-slate .kpi-num { color: var(--slate); }
+
+.kpi-desc { font-size: 13px; color: var(--muted); }
+
+/* NARRATIVE ROW */
+.narrative {
+  display: grid;
+  grid-template-columns: 1fr 280px;
+  gap: 16px;
+}
+
+.story-card, .chart-card, .table-card {
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+.story-card {
+  padding: 22px 24px;
+}
+
+.story-card h3 {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--red);
+  line-height: 1.3;
+  margin: 8px 0 12px;
+}
+
+.story-card p {
+  font-size: 14px;
+  line-height: 1.7;
+  color: #52463b;
+}
+
+.story-card p + p { margin-top: 10px; }
+
+.chart-card {
+  padding: 18px 20px;
+}
+
+.chart-card h4 {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 14px;
+}
+
+/* TABLE */
+.table-card { overflow: hidden; }
+
+.table-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface2);
+}
+
+.table-header h3 {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.table-chip {
+  font-size: 12px;
+  padding: 4px 12px;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 99px;
+  color: var(--muted);
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+th {
+  text-align: left;
+  padding: 10px 16px;
+  font-size: 11px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--hint);
+  border-bottom: 1px solid var(--border);
+  background: var(--surface2);
+  font-weight: 600;
+}
+
+td {
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+  vertical-align: middle;
+}
+
+tr:last-child td { border-bottom: 0; }
+
+tr:hover td { background: var(--surface2); }
+
+.pill {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 9px;
+  border-radius: 99px;
+  letter-spacing: 0.3px;
+}
+
+.pill-N3 { background: var(--red-bg); color: var(--red); border: 1px solid var(--red-border); }
+.pill-N2 { background: var(--amber-bg); color: var(--amber); border: 1px solid var(--amber-border); }
+.pill-N1 { background: var(--green-bg); color: var(--green); border: 1px solid var(--green-border); }
+.pill-N0 { background: var(--slate-bg); color: var(--slate); border: 1px solid var(--slate-border); }
+
+.demanda-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.demanda-track {
+  flex: 1;
+  height: 5px;
+  background: var(--border);
+  border-radius: 99px;
+  overflow: hidden;
+  max-width: 60px;
+}
+
+.demanda-fill {
+  height: 100%;
+  border-radius: 99px;
+  background: var(--amber);
+}
+
+@media (max-width: 980px) {
+  .layout { grid-template-columns: 1fr; }
+  .sidebar { position: relative; height: auto; flex-direction: row; flex-wrap: wrap; padding: 16px; gap: 4px; }
+  .kpi-grid { grid-template-columns: repeat(2,1fr); }
+  .narrative { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+<div class="layout">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-label">Monitoramento</div>
+      <h1>Painel ARED</h1>
+      <div class="semester">2027.1 — São Paulo</div>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-section-title">Núcleo Regional</div>
+      <div class="filter-item active" data-regional="TODAS" onclick="setRegional('TODAS',this)">
+        <span class="filter-dot"></span>
+        Todas as Regionais
+        <span class="filter-count" id="cnt-TODAS">1878</span>
+      </div>
+      <div class="filter-item" data-regional="Bauru/Araçatuba" onclick="setRegional('Bauru/Araçatuba',this)">
+        <span class="filter-dot"></span>
+        Bauru/Araçatuba
+        <span class="filter-count">100</span>
+      </div>
+      <div class="filter-item" data-regional="Campinas Norte" onclick="setRegional('Campinas Norte',this)">
+        <span class="filter-dot"></span>
+        Campinas Norte
+        <span class="filter-count">108</span>
+      </div>
+      <div class="filter-item" data-regional="Campinas Sul" onclick="setRegional('Campinas Sul',this)">
+        <span class="filter-dot"></span>
+        Campinas Sul
+        <span class="filter-count">163</span>
+      </div>
+      <div class="filter-item" data-regional="Grande São Paulo Leste" onclick="setRegional('Grande São Paulo Leste',this)">
+        <span class="filter-dot"></span>
+        Grande SP Leste
+        <span class="filter-count">258</span>
+      </div>
+      <div class="filter-item" data-regional="Grande São Paulo Noroeste" onclick="setRegional('Grande São Paulo Noroeste',this)">
+        <span class="filter-dot"></span>
+        Grande SP Noroeste
+        <span class="filter-count">243</span>
+      </div>
+      <div class="filter-item" data-regional="Grande São Paulo Sul/Baixada Santista" onclick="setRegional('Grande São Paulo Sul/Baixada Santista',this)">
+        <span class="filter-dot"></span>
+        Grande SP Sul/BS
+        <span class="filter-count">281</span>
+      </div>
+      <div class="filter-item" data-regional="Itapeva/Registro" onclick="setRegional('Itapeva/Registro',this)">
+        <span class="filter-dot"></span>
+        Itapeva/Registro
+        <span class="filter-count">41</span>
+      </div>
+      <div class="filter-item" data-regional="Marília/Presidente Prudente" onclick="setRegional('Marília/Presidente Prudente',this)">
+        <span class="filter-dot"></span>
+        Marília/Pres. Prudente
+        <span class="filter-count">151</span>
+      </div>
+      <div class="filter-item" data-regional="Ribeirão Preto/Franca/Barretos" onclick="setRegional('Ribeirão Preto/Franca/Barretos',this)">
+        <span class="filter-dot"></span>
+        Ribeirão/Franca
+        <span class="filter-count">167</span>
+      </div>
+      <div class="filter-item" data-regional="São José do Rio Preto/Central" onclick="setRegional('São José do Rio Preto/Central',this)">
+        <span class="filter-dot"></span>
+        São José Rio Preto
+        <span class="filter-count">112</span>
+      </div>
+      <div class="filter-item" data-regional="Sorocaba" onclick="setRegional('Sorocaba',this)">
+        <span class="filter-dot"></span>
+        Sorocaba
+        <span class="filter-count">141</span>
+      </div>
+      <div class="filter-item" data-regional="Vale do Paraíba/Litoral Norte" onclick="setRegional('Vale do Paraíba/Litoral Norte',this)">
+        <span class="filter-dot"></span>
+        Vale do Paraíba/LN
+        <span class="filter-count">113</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- MAIN CONTENT -->
+  <main class="main">
+
+    <!-- HERO -->
+    <section class="hero">
+      <div class="hero-top">
+        <div>
+          <div class="eyebrow">Monitoramento de Evasão — CEETEPS</div>
+          <h2 id="hero-title">Visão Geral — Todas as Regionais</h2>
+          <div class="hero-regional">Regional: <strong id="hero-regional">Todas as Regionais</strong></div>
+        </div>
+        <div class="alert-badge">
+          <div class="badge-label">Turmas em alerta</div>
+          <div class="badge-num" id="badge-alerta">746</div>
+          <div class="badge-sub">Níveis N3 + N2</div>
+        </div>
+      </div>
+
+      <div class="kpi-grid">
+        <div class="kpi-card kpi-red">
+          <div class="kpi-label">N3 — Crítico</div>
+          <div class="kpi-num" id="kpi-n3">284</div>
+          <div class="kpi-desc">Alto nível de evasão</div>
+        </div>
+        <div class="kpi-card kpi-amber">
+          <div class="kpi-label">N2 — Atenção</div>
+          <div class="kpi-num" id="kpi-n2">462</div>
+          <div class="kpi-desc">Médio nível de evasão</div>
+        </div>
+        <div class="kpi-card kpi-green">
+          <div class="kpi-label">N1 — Estável</div>
+          <div class="kpi-num" id="kpi-n1">982</div>
+          <div class="kpi-desc">Baixo nível de evasão</div>
+        </div>
+        <div class="kpi-card kpi-slate">
+          <div class="kpi-label">N0 — Sem evasão</div>
+          <div class="kpi-num" id="kpi-n0">150</div>
+          <div class="kpi-desc">Situação preservada</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- NARRATIVE ROW -->
+    <div class="narrative">
+      <article class="story-card">
+        <div class="eyebrow">Prioridade de acompanhamento</div>
+        <h3 id="story-title">Unidade mais crítica desta regional</h3>
+        <p id="story-body">Selecione uma regional para ver a unidade prioritária com maior concentração de turmas em alerta (N3 + N2).</p>
+        <p id="story-body2" style="margin-top:10px;font-size:13px;color:var(--hint);">Os dados refletem a versão ARED 2027.1 com 1.878 turmas analisadas em 12 núcleos regionais do estado de São Paulo.</p>
+      </article>
+
+      <div class="chart-card">
+        <h4>Distribuição por nível</h4>
+        <div style="position:relative;height:190px;">
+          <canvas id="donutChart" role="img" aria-label="Gráfico de rosca com distribuição por nível: N3 284, N2 462, N1 982, N0 150">N3: 284, N2: 462, N1: 982, N0: 150</canvas>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;">
+          <span style="font-size:12px;display:flex;align-items:center;gap:4px;color:var(--muted)"><span style="width:9px;height:9px;border-radius:2px;background:#9f2b1a;display:inline-block"></span>N3 Crítico</span>
+          <span style="font-size:12px;display:flex;align-items:center;gap:4px;color:var(--muted)"><span style="width:9px;height:9px;border-radius:2px;background:#a06300;display:inline-block"></span>N2 Atenção</span>
+          <span style="font-size:12px;display:flex;align-items:center;gap:4px;color:var(--muted)"><span style="width:9px;height:9px;border-radius:2px;background:#3a6b43;display:inline-block"></span>N1 Estável</span>
+          <span style="font-size:12px;display:flex;align-items:center;gap:4px;color:var(--muted)"><span style="width:9px;height:9px;border-radius:2px;background:#546070;display:inline-block"></span>N0 Sem evasão</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- BAR CHART ALL REGIONAIS (shown only when TODAS selected) -->
+    <div class="story-card" id="bar-section">
+      <div class="eyebrow">Comparativo por Regional</div>
+      <div style="font-size:15px;font-weight:700;color:var(--text);margin:6px 0 14px">Turmas em alerta (N3 + N2) por núcleo regional</div>
+      <div style="position:relative;height:260px;">
+        <canvas id="barChart" role="img" aria-label="Gráfico de barras com turmas em alerta por regional">Dados das 12 regionais.</canvas>
+      </div>
+    </div>
+
+    <!-- TABLE -->
+    <section class="table-card">
+      <div class="table-header">
+        <div>
+          <div class="eyebrow" style="margin-bottom:2px">Leitura tabular</div>
+          <h3>Turmas por nível de evasão</h3>
+        </div>
+        <div class="table-chip" id="table-chip">Todas as regionais — 1878 turmas</div>
+      </div>
+      <div style="overflow-x:auto;">
+        <table>
+          <thead>
+            <tr>
+              <th>Unidade</th>
+              <th>Curso</th>
+              <th>Turma</th>
+              <th>Vagas</th>
+              <th>Inscritos</th>
+              <th>Demanda</th>
+              <th>Nível</th>
+            </tr>
+          </thead>
+          <tbody id="table-body">
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+const DATA = {"totais":{"n3":284,"n2":462,"n1":982,"n0":150,"alerta":746,"total":1878},"regionais":{"Bauru/Araçatuba":{"n3":24,"n2":27,"n1":41,"n0":8,"alerta":51,"total":100,"top_unidade":"Etec Joaquim Ferreira do Amaral","top_count":8,"rows":[{"unidade":"Etec Doutor Renato Cordeiro","curso":"Administração - MTec","turma":"Turma A","vagas":40,"inscritos":204,"demanda":5.1,"diagnostico":"Sem Evasão","nivel":"N0"},{"unidade":"Etec de Lins","curso":"Desenvolvimento de Sistemas - MTec","turma":"Turma A","vagas":40,"inscritos":231,"demanda":5.78,"diagnostico":"Sem Evasão","nivel":"N0"},{"unidade":"Etec Doutor Renato Cordeiro","curso":"Marketing - MTec","turma":"Turma A","vagas":40,"inscritos":147,"demanda":3.67,"diagnostico":"Sem Evasão","nivel":"N0"},{"unidade":"Etec Joaquim Ferreira do Amaral","curso":"Administração - MTec-PI","turma":"Turma A","vagas":40,"inscritos":264,"demanda":6.6,"diagnostico":"Sem Evasão","nivel":"N0"},{"unidade":"Etec de Lins","curso":"Ciência de Dados","turma":"Turma A","vagas":40,"inscritos":43,"demanda":1.07,"diagnostico":"Baixo Nível de Evasão","nivel":"N1"},{"unidade":"Etec de Ilha Solteira","curso":"Segurança do Trabalho","turma":"Turma A","vagas":40,"inscritos":99,"demanda":2.48,"diagnostico":"Baixo Nível de Evasão","nivel":"N1"},{"unidade":"Etec João Jorge Geraissate","curso":"Agropecuária - MTec-PI","turma":"Turma A","vagas":35,"inscritos":43,"demanda":1.23,"diagnostico":"Baixo Nível de Evasão","nivel":"N1"},{"unidade":"Etec Rodrigues de Abreu","curso":"Informática para Internet - MTec","turma":"Turma A","vagas":40,"inscritos":187,"demanda":4.67,"diagnostico":"Baixo Nível de Evasão","nivel":"N1"},{"unidade":"Etec Sebastiana Augusta de Moraes","curso":"Agronegócio","turma":"Turma A","vagas":40,"inscritos":68,"demanda":1.7,"diagnostico":"Médio Nível de Evasão","nivel":"N2"},{"unidade":"Etec Astor de Mattos Carvalho","curso":"Administração - MTec-PI","turma":"Turma A","vagas":35,"inscritos":55,"demanda":1.57,"diagnostico":"Médio Nível de Evasão","nivel":"N2"},{"unidade":"Etec Joaquim Ferreira do Amaral","curso":"Administração - MTec-PI","turma":"Turma A","vagas":40,"inscritos":45,"demanda":1.13,"diagnostico":"Médio Nível de Evasão","nivel":"N2"},{"unidade":"Etec Rodrigues de Abreu","curso":"Enfermagem","turma":"Turma A","vagas":40,"inscritos":154,"demanda":3.85,"diagnostico":"Alto Nível de Evasão","nivel":"N3"},{"unidade":"Etec Joaquim Ferreira do Amaral","curso":"Eletrotécnica","turma":"Turma A","vagas":40,"inscritos":59,"demanda":1.48,"diagnostico":"Alto Nível de Evasão","nivel":"N3"},{"unidade":"Etec Professor Urias Ferreira","curso":"Agropecuária - MTec-PI","turma":"Turma A","vagas":35,"inscritos":74,"demanda":2.11,"diagnostico":"Alto Nível de Evasão","nivel":"N3"},{"unidade":"Etec Rodrigues de Abreu","curso":"Desenvolvimento de Sistemas - MTec-PI","turma":"Turma A","vagas":40,"inscritos":400,"demanda":10.0,"diagnostico":"Baixo Nível de Evasão","nivel":"N1"}]},"Campinas Norte":{"n3":18,"n2":23,"n1":64,"n0":3,"alerta":41,"total":108,"top_unidade":"Etec Pedro Ferreira Alves","top_count":5,"rows":[{"unidade":"Etec Tenente Aviador Gustavo Klug","curso":"Administração - MTec-PI","turma":"Turma A","vagas":40,"inscritos":72,"demanda":1.8,"diagnostico":"Sem Evasão","nivel":"N0"},{"unidade":"Etec Professor Armando Bayeux da Silva","curso":"Administração - MTec","turma":"Turma A","vagas":40,"inscritos":259,"demanda":6.47,"diagnostico":"Sem Evasão","nivel":"N0"},{"unidade":"Etec Professor Rodolpho José Del Guerra","curso":"Ensino Médio com Itinerário Formativo","turma":"Turma A","vagas":40,"inscritos":153,"demanda":3.83,"diagnostico":"Sem Evasão","nivel":"N0"},{"unidade":"Etec Pedro Ferreira Alves","curso":"Meio Ambiente - MTec","turma":"Turma A","vagas":40,"inscritos":100,"demanda":2.5,"diagnostico":"Baixo Nível de Evasão","nivel":"N1"},{"unidade":"Etec Euro Albino de Souza","curso":"Administração - MTec-PI","turma":"Turma A","vagas":40,"inscritos":163,"demanda":4.08,"diagnostico":"Baixo Nível de Evasão","nivel":"N1"},{"unidade":"Etec Trajano Camargo","curso":"Administração - MTec-PI","turma":"Turma A","vagas":40,"inscritos":360,"demanda":9.0,"diagnostico":"Baixo Nível de Evasão","nivel":"N1"},{"unidade":"Etec Pedro Ferreira Alves","curso":"Meio Ambiente - MTec","turma":"Turma A","vagas":40,"inscritos":56,"demanda":1.4,"diagnostico":"Médio Nível de Evasão","nivel":"N2"},{"unidade":"Etec Trajano Camargo","curso":"Eletrônica","turma":"Turma A","vagas":40,"inscritos":48,"demanda":1.2,"diagnostico":"Médio Nível de Evasão","nivel":"N2"},{"unidade":"Etec Pedro Ferreira Alves","curso":"Logística - MTec","turma":"Turma A","vagas":40,"inscritos":38,"demanda":0.95,"diagnostico":"Alto Nível de Evasão","nivel":"N3"},{"unidade":"Etec João Elias Margutti","curso":"Mecânica - MTec-PI","turma":"Turma A","vagas":35,"inscritos":32,"demanda":0.91,"diagnostico":"Alto Nível de Evasão","nivel":"N3"},{"unidade":"Etec Trajano Camargo","curso":"Mecânica - MTec-PI","turma":"Turma A","vagas":40,"inscritos":163,"demanda":4.08,"diagnostico":"Baixo Nível de Evasão","nivel":"N1"},{"unidade":"Etec Professor Jadyr Salles","curso":"Administração - MTec-PI","turma":"Turma A","vagas":35,"inscritos":95,"demanda":2.71,"diagnostico":"Baixo Nível de Evasão","nivel":"N1"},{"unidade":"Etec de Vargem Grande do Sul","curso":"Informática para Internet - MTec","turma":"Turma A","vagas":40,"inscritos":113,"demanda":2.83,"diagnostico":"Baixo Nível de Evasão","nivel":"N1"},{"unidade":"Etec Pedro Ferreira Alves","curso":"Logística - MTec","turma":"Turma A","vagas":40,"inscritos":101,"demanda":2.52,"diagnostico":"Baixo Nível de Evasão","nivel":"N1"},{"unidade":"Etec João Elias Margutti","curso":"Recursos Humanos - MTec","turma":"Turma A","vagas":35,"inscritos":66,"demanda":1.89,"diagnostico":"Baixo Nível de Evasão","nivel":"N1"}]},"Campinas Sul":{"n3":23,"n2":31,"n1":87,"n0":22,"alerta":54,"total":163,"top_unidade":"Etec Vasco Antonio Venchiarutti","top_count":6,"rows":[{"unidade":"Etec de Campo Limpo Paulista","curso":"Logística - Mtec-N","turma":"Turma A","vagas":35,"inscritos":125,"demanda":3.57,"diagnostico":"Sem Evasão","nivel":"N0"},{"unidade":"Etec de Hortolândia","curso":"Nutrição e Dietética - MTec-PI","turma":"Turma A","vagas":40,"inscritos":499,"demanda":12.47,"diagnostico":"Sem Evasão","nivel":"N0"},{"unidade":"Etec Bento Quirino","curso":"Eletrônica - MTec-PI","turma":"Turma A","vagas":35,"inscritos":259,"demanda":7.4,"diagnostico":"Sem Evasão","nivel":"N0"},{"unidade":"Etec Vasco Antonio Venchiarutti","curso":"Edificações - MTec-PI","turma":"Turma A","vagas":40,"inscritos":147,"demanda":3.67,"diagnostico":"Sem Evasão","nivel":"N0"},{"unidade":"Etec Bento Quirino","curso":"Administração - MTec-PI","turma":"Turma A","vagas":35,"inscritos":403,"demanda":11.51,"diagnostico":"Sem Evasão","nivel":"N0"},{"unidade":"Etec Vasco Antonio Venchiarutti","curso":"Logística - MTec","turma":"Turma A","vagas":40,"inscritos":168,"demanda":4.2,"diagnostico":"Sem Evasão","nivel":"N0"},{"unidade":"Etec Vasco Antonio Venchiarutti","curso":"Informática para Internet","turma":"Turma A","vagas":40,"inscritos":56,"demanda":1.4,"diagnostico":"Médio Nível de Evasão","nivel":"N2"},{"unidade":"Etec Coronel Fernando Febeliano da Costa","curso":"Mecatrônica - MTec","turma":"Turma A","vagas":36,"inscritos":48,"demanda":1.33,"diagnostico":"Médio Nível de Evasão","nivel":"N2"},{"unidade":"Etec Benedito Storani","curso":"Eletrônica - MTec","turma":"Turma A","vagas":40,"inscritos":43,"demanda":1.08,"diagnostico":"Alto Nível de Evasão","nivel":"N3"},{"unidade":"Etec Vasco Antonio Venchiarutti","curso":"Edificações - MTec","turma":"Turma A","vagas":40,"inscritos":36,"demanda":0.9,"diagnostico":"Alto Nível de Evasão","nivel":"N3"},{"unidade":"Etec de Campo Limpo Paulista","curso":"Informática para Internet - MTec","turma":"Turma A","vagas":35,"inscritos":327,"demanda":9.34,"diagnostico":"Sem Evasão","nivel":"N0"},{"unidade":"Etec Sumaré Cidade Orquídea","curso":"Meio Ambiente - MTec","turma":"Turma A","vagas":40,"inscritos":151,"demanda":3.77,"diagnostico":"Sem Evasão","nivel":"N0"},{"unidade":"Etec de Hortolândia","curso":"Administração - MTec-PI","turma":"Turma A","vagas":40,"inscritos":281,"demanda":7.03,"diagnostico":"Sem Evasão","nivel":"N0"},{"unidade":"Etec Professor Carmine Biagio Tundisi","curso":"Desenvolvimento de Sistemas - MTec","turma":"Turma A","vagas":40,"inscritos":81,"demanda":2.02,"diagnostico":"Sem Evasão","nivel":"N0"},{"unidade":"Etec Conselheiro Antonio Prado","curso":"Biotecnologia - MTec-PI","turma":"Turma A","vagas":40,"inscritos":438,"demanda":10.95,"diagnostico":"Sem Evasão","nivel":"N0"}]},"Grande São Paulo Leste":{"n3":34,"n2":68,"n1":127,"n0":29,"alerta":102,"total":258,"top_unidade":"Etec Professor Horácio Augusto da Silveira","top_count":9,"rows":[{"unidade":"Etec de Tiquatira","curso":"Marketing - MTec","turma":"Turma A","vagas":40,"inscritos":241,"demanda":6.03,"diagnostico":"Sem Evasão","nivel":"N0"},{"unidade":"Etec de Suzano","curso":"Administração - MTec","turma":"Turma A","vagas":40,"inscritos":446,"demanda":11.15,"diagnostico":"Sem Evasão","nivel":"N0"},{"unidade":"Etec Carlos de Campos","curso":"Design de Moda","turma":"Turma A","vagas":40,"inscritos":149,"demanda":3.73,"diagnostico":"Sem Evasão","nivel":"N0"},{"unidade":"Etec Zona Leste","curso":"Administração - MTec","turma":"Turma A","vagas":35,"inscritos":455,"demanda":13.0,"diagnostico":"Sem Evasão","nivel":"N0"},{"unidade":"Etec de Poá","curso":"Marketing - MTec","turma":"Turma A","vagas":40,"inscritos":206,"demanda":5.15,"diagnostico":"Sem Evasão","nivel":"N0"},{"unidade":"Etec São Mateus","curso":"Desenvolvimento de Sistemas - MTec","turma":"Turma A","vagas":40,"inscritos":326,"demanda":8.15,"diagnostico":"Sem Evasão","nivel":"N0"},{"unidade":"Etec Professor Horácio Augusto da Silveira","curso":"Administração - MTec-PI","turma":"Turma A","vagas":40,"inscritos":48,"demanda":1.2,"diagnostico":"Médio Nível de Evasão","nivel":"N2"},{"unidade":"Etec Zona Leste","curso":"Eletrônica - MTec","turma":"Turma A","vagas":35,"inscritos":42,"demanda":1.2,"diagnostico":"Médio Nível de Evasão","nivel":"N2"},{"unidade":"Etec Professor Horácio Augusto da Silveira","curso":"Mecânica - MTec","turma":"Turma A","vagas":40,"inscritos":36,"demanda":0.9,"diagnostico":"Alto Nível de Evasão","nivel":"N3"},{"unidade":"Etec de Itaquaquecetuba","curso":"Administração - MTec-PI","turma":"Turma A","vagas":40,"inscritos":32,"demanda":0.8,"diagnostico":"Alto Nível de Evasão","nivel":"N3"},{"unidade":"Etec de Tiquatira","curso":"Química - MTec","turma":"Turma A","vagas":40,"inscritos":307,"demanda":7.67,"diagnostico":"Sem Evasão","nivel":"N0"},{"unidade":"Etec Zona Leste","curso":"Recursos Humanos - MTec","turma":"Turma A","vagas":35,"inscritos":236,"demanda":6.74,"diagnostico":"Sem Evasão","nivel":"N0"},{"unidade":"Etec de Itaquaquecetuba","curso":"Desenvolvimento de Sistemas - MTec","turma":"Turma A","vagas":40,"inscritos":462,"demanda":11.55,"diagnostico":"Sem Evasão","nivel":"N0"},{"unidade":"Etec São Mateus","curso":"Química - MTec","turma":"Turma A","vagas":40,"inscritos":115,"demanda":2.88,"diagnostico":"Baixo Nível de Evasão","nivel":"N1"},{"unidade":"Etec de Poá","curso":"Desenvolvimento de Sistemas - MTec","turma":"Turma A","vagas":40,"inscritos":502,"demanda":12.55,"diagnostico":"Sem Evasão","nivel":"N0"}]},"Grande São Paulo Noroeste":{"n3":36,"n2":61,"n1":129,"n0":17,"alerta":97,"total":243,"top_unidade":"Etec Guaracy Silveira","top_count":7,"rows":[{"unidade":"Etec de Artes","curso":"Design de Interiores - MTec","turma":"Turma A","vagas":30,"inscritos":338,"demanda":11.27,"diagnostico":"Sem Evasão","nivel":"N0"},{"unidade":"Etec de Carapicuíba","curso":"Design Gráfico - MTec","turma":"Turma A","vagas":40,"inscritos":323,"demanda":8.07,"diagnostico":"Sem Evasão","nivel":"N0"},{"unidade":"Etec Albert Einstein","curso":"Administração - MTec","turma":"Turma A","vagas":40,"inscritos":331,"demanda":8.28,"diagnostico":"Sem Evasão","nivel":"N0"},{"unidade":"Etec Jaraguá","curso":"Desenvolvimento de Sistemas - MTec","turma":"Turma A","vagas":40,"inscritos":352,"demanda":8.8,"diagnostico":"Sem Evasão","nivel":"N0"},{"unidade":"Etec Antônio Furlan","curso":"Informática para Internet - MTec","turma":"Turma A","vagas":40,"inscritos":872,"demanda":21.8,"diagnostico":"Sem Evasão","nivel":"N0"},{"unidade":"Etec Guaracy Silveira","curso":"Administração - MTec-PI","turma":"Turma A","vagas":40,"inscritos":52,"demanda":1.3,"diagnostico":"Médio Nível de Evasão","nivel":"N2"},{"unidade":"Etec Guaracy Silveira","curso":"Eletrônica - MTec","turma":"Turma A","vagas":40,"inscritos":44,"demanda":1.1,"diagnostico":"Médio Nível de Evasão","nivel":"N2"},{"unidade":"Etec Professor Basílides de Godoy","curso":"Mecânica - MTec","turma":"Turma A","vagas":40,"inscritos":38,"demanda":0.95,"diagnostico":"Alto Nível de Evasão","nivel":"N3"},{"unidade":"Etec Guaracy Silveira","curso":"Mecatrônica - MTec","turma":"Turma A","vagas":40,"inscritos":32,"demanda":0.8,"diagnostico":"Alto Nível de Evasão","nivel":"N3"},{"unidade":"Etec Professora Ermelinda Giannini Teixeira","curso":"Desenvolvimento de Sistemas - MTec","turma":"Turma A","vagas":40,"inscritos":292,"demanda":7.3,"diagnostico":"Sem Evasão","nivel":"N0"},{"unidade":"Etec Jaraguá","curso":"Mecânica - MTec","turma":"Turma A","vagas":40,"inscritos":115,"demanda":2.88,"diagnostico":"Baixo Nível de Evasão","nivel":"N1"},{"unidade":"Etec Paulo do Carmo Monteiro","curso":"Marketing - MTec","turma":"Turma A","vagas":40,"inscritos":79,"demanda":1.98,"diagnostico":"Sem Evasão","nivel":"N0"},{"unidade":"Etec Parque da Juventude","curso":"Recursos Humanos - MTec","turma":"Turma A","vagas":40,"inscritos":224,"demanda":5.6,"diagnostico":"Sem Evasão","nivel":"N0"},{"unidade":"Etec Gino Rezaghi","curso":"Administração - MTec-PI","turma":"Turma A","vagas":40,"inscritos":201,"demanda":5.03,"diagnostico":"Sem Evasão","nivel":"N0"},{"unidade":"Etec de Francisco Morato","curso":"Informática para Internet - MTec","turma":"Turma A","vagas":40,"inscritos":100,"demanda":2.5,"diagnostico":"Sem Evasão","nivel":"N0"}]},"Grande São Paulo Sul/Baixada Santista":{"n3":27,"n2":89,"n1":150,"n0":15,"alerta":116,"total":281,"top_unidade":"Etec Getúlio Vargas","top_count":18,"rows":[{"unidade":"Etec de Praia Grande","curso":"Logística - MTec","turma":"Turma A","vagas":40,"inscritos":295,"demanda":7.38,"diagnostico":"Sem Evasão","nivel":"N0"},{"unidade":"Etec Juscelino Kubitschek de Oliveira","curso":"Administração - MTec","turma":"Turma A","vagas":40,"inscritos":375,"demanda":9.38,"diagnostico":"Sem Evasão","nivel":"N0"},{"unidade":"Etec Irmã Agostina","curso":"Nutrição e Dietética - MTec-PI","turma":"Turma A","vagas":40,"inscritos":362,"demanda":9.05,"diagnostico":"Sem Evasão","nivel":"N0"},{"unidade":"Etec de Mauá","curso":"Administração - MTec","turma":"Turma A","vagas":40,"inscritos":243,"demanda":6.08,"diagnostico":"Sem Evasão","nivel":"N0"},{"unidade":"Etec Alberto Santos Dumont","curso":"Ensino Médio com Itinerário Formativo","turma":"Turma A","vagas":40,"inscritos":192,"demanda":4.8,"diagnostico":"Sem Evasão","nivel":"N0"},{"unidade":"Etec de Rio Grande da Serra","curso":"Edificações - MTec","turma":"Turma A","vagas":40,"inscritos":94,"demanda":2.35,"diagnostico":"Sem Evasão","nivel":"N0"},{"unidade":"Etec Getúlio Vargas","curso":"Administração - MTec-PI","turma":"Turma A","vagas":40,"inscritos":52,"demanda":1.3,"diagnostico":"Médio Nível de Evasão","nivel":"N2"},{"unidade":"Etec Lauro Gomes","curso":"Eletrônica - MTec","turma":"Turma A","vagas":40,"inscritos":44,"demanda":1.1,"diagnostico":"Médio Nível de Evasão","nivel":"N2"},{"unidade":"Etec Getúlio Vargas","curso":"Mecânica - MTec","turma":"Turma A","vagas":40,"inscritos":36,"demanda":0.9,"diagnostico":"Alto Nível de Evasão","nivel":"N3"},{"unidade":"Etec Aristóteles Ferreira","curso":"Edificações - MTec","turma":"Turma A","vagas":40,"inscritos":32,"demanda":0.8,"diagnostico":"Alto Nível de Evasão","nivel":"N3"},{"unidade":"Etec Jorge Street","curso":"Administração - MTec","turma":"Turma A","vagas":40,"inscritos":101,"demanda":2.52,"diagnostico":"Sem Evasão","nivel":"N0"},{"unidade":"Etec de Cotia","curso":"Contabilidade - MTec-PI","turma":"Turma A","vagas":40,"inscritos":99,"demanda":2.48,"diagnostico":"Sem Evasão","nivel":"N0"},{"unidade":"Etec de Praia Grande","curso":"Química - MTec","turma":"Turma A","vagas":40,"inscritos":187,"demanda":4.67,"diagnostico":"Sem Evasão","nivel":"N0"},{"unidade":"Etec Lauro Gomes","curso":"Desenvolvimento de Sistemas","turma":"Turma A","vagas":40,"inscritos":187,"demanda":4.67,"diagnostico":"Sem Evasão","nivel":"N0"},{"unidade":"Etec Professora Maria Cristina Medeiros","curso":"Informática para Internet - MTec","turma":"Turma A","vagas":40,"inscritos":117,"demanda":2.92,"diagnostico":"Sem Evasão","nivel":"N0"}]},"Itapeva/Registro":{"n3":6,"n2":7,"n1":24,"n0":4,"alerta":13,"total":41,"top_unidade":"Etec Doutor Demétrio Azevedo Júnior","top_count":4,"rows":[{"unidade":"Etec de Apiaí","curso":"Recursos Humanos - MTec","turma":"Turma A","vagas":35,"inscritos":102,"demanda":2.91,"diagnostico":"Sem Evasão","nivel":"N0"},{"unidade":"Etec Doutor Celso Charuri","curso":"Guia de Turismo - MTec","turma":"Turma A","vagas":35,"inscritos":55,"demanda":1.57,"diagnostico":"Sem Evasão","nivel":"N0"},{"unidade":"Etec Professora Terezinha Monteiro dos Santos","curso":"Administração - MTec-PI","turma":"Turma A","vagas":35,"inscritos":170,"demanda":4.86,"diagnostico":"Sem Evasão","nivel":"N0"},{"unidade":"Etec de Registro","curso":"Desenvolvimento de Sistemas - MTec-PI","turma":"Turma A","vagas":35,"inscritos":244,"demanda":6.97,"diagnostico":"Sem Evasão","nivel":"N0"},{"unidade":"Etec de Apiaí","curso":"Administração - MTec-PI","turma":"Turma A","vagas":35,"inscritos":71,"demanda":2.03,"diagnostico":"Baixo Nível de Evasão","nivel":"N1"},{"unidade":"Etec Waldyr Duron Junior","curso":"Desenvolvimento de Sistemas - MTec","turma":"Turma A","vagas":40,"inscritos":101,"demanda":2.52,"diagnostico":"Baixo Nível de Evasão","nivel":"N1"},{"unidade":"Etec de Registro","curso":"Administração - MTec-PI","turma":"Turma A","vagas":35,"inscritos":290,"demanda":8.29,"diagnostico":"Baixo Nível de Evasão","nivel":"N1"},{"unidade":"Etec de Itararé","curso":"Administração - MTec-N","turma":"Turma A","vagas":40,"inscritos":71,"demanda":1.77,"diagnostico":"Baixo Nível de Evasão","nivel":"N1"},{"unidade":"Etec Professora Terezinha Monteiro dos Santos","curso":"Marketing - MTec-PI","turma":"Turma A","vagas":35,"inscritos":115,"demanda":3.29,"diagnostico":"Baixo Nível de Evasão","nivel":"N1"},{"unidade":"Etec Waldyr Duron Junior","curso":"Logística - MTec","turma":"Turma A","vagas":40,"inscritos":48,"demanda":1.2,"diagnostico":"Médio Nível de Evasão","nivel":"N2"},{"unidade":"Etec de Apiaí","curso":"Administração - MTec-N","turma":"Turma A","vagas":35,"inscritos":34,"demanda":0.97,"diagnostico":"Baixo Nível de Evasão","nivel":"N1"},{"unidade":"Etec Doutor Celso Charuri","curso":"Serviços Jurídicos - MTec-N","turma":"Turma A","vagas":35,"inscritos":64,"demanda":1.83,"diagnostico":"Baixo Nível de Evasão","nivel":"N1"},{"unidade":"Etec de Itararé","curso":"Administração - MTec-PI","turma":"Turma A","vagas":40,"inscritos":84,"demanda":2.1,"diagnostico":"Baixo Nível de Evasão","nivel":"N1"},{"unidade":"Etec de Itararé","curso":"Serviços Jurídicos - MTec-PI","turma":"Turma A","vagas":40,"inscritos":82,"demanda":2.05,"diagnostico":"Baixo Nível de Evasão","nivel":"N1"},{"unidade":"Etec Professora Terezinha Monteiro dos Santos","curso":"Desenvolvimento de Sistemas - MTec-PI","turma":"Turma A","vagas":35,"inscritos":131,"demanda":3.74,"diagnostico":"Baixo Nível de Evasão","nivel":"N1"}]},"Marília/Presidente Prudente":{"n3":39,"n2":40,"n1":61,"n0":11,"alerta":79,"total":151,"top_unidade":"Etec Amim Jundi","top_count":9,"rows":[{"unidade":"Etec Antonio Devisate","curso":"Administração - MTec-PI","turma":"Turma A","vagas":40,"inscritos":251,"demanda":6.28,"diagnostico":"Sem Evasão","nivel":"N0"},{"unidade":"Etec Professor Massuyuki Kawano","curso":"Ensino Médio com Itinerário Formativo","turma":"Turma A","vagas":40,"inscritos":175,"demanda":4.38,"diagnostico":"Sem Evasão","nivel":"N0"},{"unidade":"Etec Monsenhor Antônio Magliano","curso":"Desenvolvimento de Sistemas - MTec-PI","turma":"Turma A","vagas":40,"inscritos":114,"demanda":2.85,"diagnostico":"Sem Evasão","nivel":"N0"},{"unidade":"Etec Professora Carmelina Barbosa","curso":"Química - MTec-PI","turma":"Turma A","vagas":40,"inscritos":105,"demanda":2.62,"diagnostico":"Sem Evasão","nivel":"N0"},{"unidade":"Etec Amim Jundi","curso":"Desenvolvimento de Sistemas - MTec","turma":"Turma A","vagas":40,"inscritos":157,"demanda":3.92,"diagnostico":"Sem Evasão","nivel":"N0"},{"unidade":"Etec Monsenhor Antônio Magliano","curso":"Mecatrônica - MTec-PI","turma":"Turma A","vagas":40,"inscritos":81,"demanda":2.02,"diagnostico":"Baixo Nível de Evasão","nivel":"N1"},{"unidade":"Etec Doutor Luiz Cesar Couto","curso":"Agropecuária - MTec","turma":"Turma A","vagas":35,"inscritos":82,"demanda":2.34,"diagnostico":"Baixo Nível de Evasão","nivel":"N1"},{"unidade":"Etec Amim Jundi","curso":"Administração - MTec-PI","turma":"Turma A","vagas":40,"inscritos":52,"demanda":1.3,"diagnostico":"Médio Nível de Evasão","nivel":"N2"},{"unidade":"Etec Jacinto Ferreira de Sá","curso":"Eletrônica - MTec","turma":"Turma A","vagas":40,"inscritos":44,"demanda":1.1,"diagnostico":"Médio Nível de Evasão","nivel":"N2"},{"unidade":"Etec Amim Jundi","curso":"Mecânica - MTec","turma":"Turma A","vagas":40,"inscritos":36,"demanda":0.9,"diagnostico":"Alto Nível de Evasão","nivel":"N3"},{"unidade":"Etec Jacinto Ferreira de Sá","curso":"Eletrotécnica - MTec","turma":"Turma A","vagas":40,"inscritos":32,"demanda":0.8,"diagnostico":"Alto Nível de Evasão","nivel":"N3"},{"unidade":"Etec Professor Eudécio Luiz Vicente","curso":"Administração - MTec-PI","turma":"Turma A","vagas":40,"inscritos":80,"demanda":2.0,"diagnostico":"Sem Evasão","nivel":"N0"},{"unidade":"Etec Paulo Guerreiro Franco","curso":"Agropecuária - MTec-PI","turma":"Turma A","vagas":40,"inscritos":100,"demanda":2.5,"diagnostico":"Sem Evasão","nivel":"N0"},{"unidade":"Etec Monsenhor Antônio Magliano","curso":"Ensino Médio com Itinerário Formativo","turma":"Turma A","vagas":40,"inscritos":98,"demanda":2.45,"diagnostico":"Baixo Nível de Evasão","nivel":"N1"},{"unidade":"Etec Professor Mário Antônio Verza","curso":"Administração - MTec-PI","turma":"Turma A","vagas":40,"inscritos":89,"demanda":2.23,"diagnostico":"Sem Evasão","nivel":"N0"}]},"Ribeirão Preto/Franca/Barretos":{"n3":16,"n2":47,"n1":92,"n0":12,"alerta":63,"total":167,"top_unidade":"Etec Antonio de Pádua Cardoso","top_count":7,"rows":[{"unidade":"Etec Professor José Carlos Seno Junior","curso":"Química - MTec-PI","turma":"Turma A","vagas":40,"inscritos":201,"demanda":5.03,"diagnostico":"Sem Evasão","nivel":"N0"},{"unidade":"Etec Ângelo Cavalheiro","curso":"Administração - MTec","turma":"Turma A","vagas":40,"inscritos":125,"demanda":3.12,"diagnostico":"Sem Evasão","nivel":"N0"},{"unidade":"Etec Coronel Raphael Brandão","curso":"Nutrição e Dietética - MTec-PI","turma":"Turma A","vagas":40,"inscritos":238,"demanda":5.95,"diagnostico":"Sem Evasão","nivel":"N0"},{"unidade":"Etec de Guaíra","curso":"Administração - MTec-PI","turma":"Turma A","vagas":40,"inscritos":92,"demanda":2.3,"diagnostico":"Sem Evasão","nivel":"N0"},{"unidade":"Etec Pedro Badran","curso":"Segurança do Trabalho","turma":"Turma A","vagas":40,"inscritos":125,"demanda":3.12,"diagnostico":"Baixo Nível de Evasão","nivel":"N1"},{"unidade":"Etec Doutor Júlio Cardoso","curso":"Administração - MTec-PI","turma":"Turma A","vagas":40,"inscritos":119,"demanda":2.98,"diagnostico":"Baixo Nível de Evasão","nivel":"N1"},{"unidade":"Etec Antonio de Pádua Cardoso","curso":"Administração - MTec-PI","turma":"Turma A","vagas":40,"inscritos":48,"demanda":1.2,"diagnostico":"Médio Nível de Evasão","nivel":"N2"},{"unidade":"Etec José Martimiano da Silva","curso":"Eletrônica - MTec","turma":"Turma A","vagas":40,"inscritos":44,"demanda":1.1,"diagnostico":"Médio Nível de Evasão","nivel":"N2"},{"unidade":"Etec Antonio de Pádua Cardoso","curso":"Mecânica - MTec","turma":"Turma A","vagas":40,"inscritos":36,"demanda":0.9,"diagnostico":"Alto Nível de Evasão","nivel":"N3"},{"unidade":"Etec de Cravinhos","curso":"Administração - MTec","turma":"Turma A","vagas":40,"inscritos":84,"demanda":2.1,"diagnostico":"Sem Evasão","nivel":"N0"},{"unidade":"Etec Ângelo Cavalheiro","curso":"Química - MTec","turma":"Turma B","vagas":40,"inscritos":52,"demanda":1.3,"diagnostico":"Sem Evasão","nivel":"N0"},{"unidade":"Etec José Martimiano da Silva","curso":"Contabilidade","turma":"Turma A","vagas":40,"inscritos":60,"demanda":1.5,"diagnostico":"Sem Evasão","nivel":"N0"},{"unidade":"Etec Professor José Carlos Seno Junior","curso":"Desenvolvimento de Sistemas","turma":"Turma A","vagas":40,"inscritos":47,"demanda":1.18,"diagnostico":"Sem Evasão","nivel":"N0"},{"unidade":"Etec Ângelo Cavalheiro","curso":"Química - MTec","turma":"Turma A","vagas":40,"inscritos":53,"demanda":1.32,"diagnostico":"Sem Evasão","nivel":"N0"},{"unidade":"Etec Professor José Ignácio Azevedo Filho","curso":"Meio Ambiente - MTec-PI","turma":"Turma A","vagas":40,"inscritos":69,"demanda":1.73,"diagnostico":"Sem Evasão","nivel":"N0"}]},"Sorocaba":{"n3":24,"n2":29,"n1":78,"n0":10,"alerta":53,"total":141,"top_unidade":"Etec Fernando Prestes","top_count":9,"rows":[{"unidade":"Etec Professor Fausto Mazzola","curso":"Programação de Jogos Digitais","turma":"Turma A","vagas":35,"inscritos":143,"demanda":4.09,"diagnostico":"Sem Evasão","nivel":"N0"},{"unidade":"Etec de Mairinque","curso":"Administração - MTec","turma":"Turma A","vagas":35,"inscritos":156,"demanda":4.46,"diagnostico":"Sem Evasão","nivel":"N0"},{"unidade":"Etec de Piedade","curso":"Administração - MTec-PI","turma":"Turma A","vagas":40,"inscritos":140,"demanda":3.5,"diagnostico":"Sem Evasão","nivel":"N0"},{"unidade":"Etec Professor Elias Miguel Júnior","curso":"Administração - MTec","turma":"Turma A","vagas":35,"inscritos":169,"demanda":4.83,"diagnostico":"Sem Evasão","nivel":"N0"},{"unidade":"Etec Professor Fausto Mazzola","curso":"Nutrição e Dietética - MTec","turma":"Turma A","vagas":35,"inscritos":135,"demanda":3.86,"diagnostico":"Sem Evasão","nivel":"N0"},{"unidade":"Etec de São Roque","curso":"Informática - MTec","turma":"Turma A","vagas":35,"inscritos":429,"demanda":12.26,"diagnostico":"Baixo Nível de Evasão","nivel":"N1"},{"unidade":"Etec Professor Fausto Mazzola","curso":"Administração - MTec-PI","turma":"Turma A","vagas":35,"inscritos":165,"demanda":4.71,"diagnostico":"Baixo Nível de Evasão","nivel":"N1"},{"unidade":"Etec Fernando Prestes","curso":"Administração - MTec-PI","turma":"Turma A","vagas":40,"inscritos":52,"demanda":1.3,"diagnostico":"Médio Nível de Evasão","nivel":"N2"},{"unidade":"Etec Rubens de Faria e Souza","curso":"Eletrônica - MTec","turma":"Turma A","vagas":40,"inscritos":44,"demanda":1.1,"diagnostico":"Médio Nível de Evasão","nivel":"N2"},{"unidade":"Etec Fernando Prestes","curso":"Mecânica - MTec","turma":"Turma A","vagas":40,"inscritos":36,"demanda":0.9,"diagnostico":"Alto Nível de Evasão","nivel":"N3"},{"unidade":"Etec Sales Gomes","curso":"Eletrotécnica - MTec","turma":"Turma A","vagas":40,"inscritos":32,"demanda":0.8,"diagnostico":"Alto Nível de Evasão","nivel":"N3"},{"unidade":"Etec Martinho Di Ciero","curso":"Administração - MTec-N","turma":"Turma A","vagas":35,"inscritos":59,"demanda":1.69,"diagnostico":"Sem Evasão","nivel":"N0"},{"unidade":"Etec Martinho Di Ciero","curso":"Design de Interiores - MTec","turma":"Turma A","vagas":35,"inscritos":68,"demanda":1.94,"diagnostico":"Sem Evasão","nivel":"N0"},{"unidade":"Etec de São Roque","curso":"Administração - MTec-N","turma":"Turma A","vagas":35,"inscritos":116,"demanda":3.31,"diagnostico":"Baixo Nível de Evasão","nivel":"N1"},{"unidade":"Etec Professor Edson Galvão","curso":"Desenvolvimento de Sistemas - MTec-AMS","turma":"Turma A","vagas":40,"inscritos":103,"demanda":2.58,"diagnostico":"Sem Evasão","nivel":"N0"}]},"São José do Rio Preto/Central":{"n3":22,"n2":25,"n1":58,"n0":7,"alerta":47,"total":112,"top_unidade":"Etec Paulino Botelho","top_count":6,"rows":[{"unidade":"Etec Doutor José Luiz Viana Coutinho","curso":"Desenvolvimento de Sistemas - MTec","turma":"Turma A","vagas":40,"inscritos":144,"demanda":3.6,"diagnostico":"Sem Evasão","nivel":"N0"},{"unidade":"Etec Professor Armando José Farinazzo","curso":"Ensino Médio com Itinerário Formativo","turma":"Turma A","vagas":40,"inscritos":201,"demanda":5.03,"diagnostico":"Sem Evasão","nivel":"N0"},{"unidade":"Etec Sylvio de Mattos Carvalho","curso":"Informática para Internet - MTec","turma":"Turma B","vagas":40,"inscritos":200,"demanda":5.0,"diagnostico":"Sem Evasão","nivel":"N0"},{"unidade":"Etec Professora Anna de Oliveira Ferraz","curso":"Informática para Internet - MTec-PI","turma":"Turma A","vagas":40,"inscritos":284,"demanda":7.1,"diagnostico":"Sem Evasão","nivel":"N0"},{"unidade":"Etec Philadelpho Gouvea Netto","curso":"Administração - MTec","turma":"Turma A","vagas":40,"inscritos":264,"demanda":6.6,"diagnostico":"Baixo Nível de Evasão","nivel":"N1"},{"unidade":"Etec Philadelpho Gouvea Netto","curso":"Eletrônica - MTec","turma":"Turma A","vagas":40,"inscritos":208,"demanda":5.2,"diagnostico":"Baixo Nível de Evasão","nivel":"N1"},{"unidade":"Etec Paulino Botelho","curso":"Administração - MTec-PI","turma":"Turma A","vagas":40,"inscritos":52,"demanda":1.3,"diagnostico":"Médio Nível de Evasão","nivel":"N2"},{"unidade":"Etec Sylvio de Mattos Carvalho","curso":"Mecatrônica - MTec-N","turma":"Turma A","vagas":40,"inscritos":44,"demanda":1.1,"diagnostico":"Médio Nível de Evasão","nivel":"N2"},{"unidade":"Etec Paulino Botelho","curso":"Mecânica - MTec","turma":"Turma A","vagas":40,"inscritos":36,"demanda":0.9,"diagnostico":"Alto Nível de Evasão","nivel":"N3"},{"unidade":"Etec Sylvio de Mattos Carvalho","curso":"Eletrotécnica - MTec","turma":"Turma A","vagas":40,"inscritos":32,"demanda":0.8,"diagnostico":"Alto Nível de Evasão","nivel":"N3"},{"unidade":"Etec Doutor José Luiz Viana Coutinho","curso":"Administração - MTec","turma":"Turma A","vagas":40,"inscritos":183,"demanda":4.58,"diagnostico":"Sem Evasão","nivel":"N0"},{"unidade":"Etec Doutor José Luiz Viana Coutinho","curso":"Administração - MTec-N","turma":"Turma A","vagas":40,"inscritos":45,"demanda":1.12,"diagnostico":"Sem Evasão","nivel":"N0"},{"unidade":"Etec Professora Marinês Teodoro de Freitas","curso":"Agropecuária (Alternância) - MTec-PI","turma":"Turma A","vagas":30,"inscritos":73,"demanda":2.43,"diagnostico":"Sem Evasão","nivel":"N0"},{"unidade":"Etec Philadelpho Gouvea Netto","curso":"Ensino Médio com Itinerário Formativo","turma":"Turma A","vagas":40,"inscritos":149,"demanda":3.73,"diagnostico":"Baixo Nível de Evasão","nivel":"N1"},{"unidade":"Etec Professor Armando José Farinazzo","curso":"Informática para Internet - MTec","turma":"Turma A","vagas":40,"inscritos":129,"demanda":3.23,"diagnostico":"Baixo Nível de Evasão","nivel":"N1"}]},"Vale do Paraíba/Litoral Norte":{"n3":15,"n2":15,"n1":71,"n0":12,"alerta":30,"total":113,"top_unidade":"Etec Padre Carlos Leôncio da Silva","top_count":5,"rows":[{"unidade":"Etec Cônego José Bento","curso":"Administração - MTec-PI","turma":"Turma A","vagas":40,"inscritos":436,"demanda":10.9,"diagnostico":"Sem Evasão","nivel":"N0"},{"unidade":"Etec de Caraguatatuba","curso":"Administração - MTec-PI","turma":"Turma A","vagas":40,"inscritos":457,"demanda":11.43,"diagnostico":"Sem Evasão","nivel":"N0"},{"unidade":"Etec Presidente Vargas","curso":"Nutrição e Dietética - MTec","turma":"Turma A","vagas":40,"inscritos":570,"demanda":14.25,"diagnostico":"Sem Evasão","nivel":"N0"},{"unidade":"Etec Professora Luzia Maria Machado","curso":"Recursos Humanos - MTec","turma":"Turma A","vagas":40,"inscritos":224,"demanda":5.6,"diagnostico":"Sem Evasão","nivel":"N0"},{"unidade":"Etec Cônego José Bento","curso":"Química - MTec-PI","turma":"Turma A","vagas":40,"inscritos":217,"demanda":5.42,"diagnostico":"Sem Evasão","nivel":"N0"},{"unidade":"Etec Doutor Geraldo José Rodrigues Alckmin","curso":"Marketing - MTec-PI","turma":"Turma A","vagas":35,"inscritos":175,"demanda":5.0,"diagnostico":"Baixo Nível de Evasão","nivel":"N1"},{"unidade":"Etec Doutor Geraldo José Rodrigues Alckmin","curso":"Informática para Internet - MTec-PI","turma":"Turma A","vagas":35,"inscritos":195,"demanda":5.57,"diagnostico":"Baixo Nível de Evasão","nivel":"N1"},{"unidade":"Etec Padre Carlos Leôncio da Silva","curso":"Administração - MTec-PI","turma":"Turma B","vagas":40,"inscritos":52,"demanda":1.3,"diagnostico":"Médio Nível de Evasão","nivel":"N2"},{"unidade":"Etec Cônego José Bento","curso":"Agropecuária - MTec-PI","turma":"Turma A","vagas":40,"inscritos":44,"demanda":1.1,"diagnostico":"Médio Nível de Evasão","nivel":"N2"},{"unidade":"Etec Padre Carlos Leôncio da Silva","curso":"Logística - MTec-PI","turma":"Turma B","vagas":40,"inscritos":36,"demanda":0.9,"diagnostico":"Alto Nível de Evasão","nivel":"N3"},{"unidade":"Etec Cônego José Bento","curso":"Meio Ambiente - MTec-PI","turma":"Turma A","vagas":40,"inscritos":31,"demanda":0.78,"diagnostico":"Alto Nível de Evasão","nivel":"N3"},{"unidade":"Etec Professora Luzia Maria Machado","curso":"Administração - MTec","turma":"Turma A","vagas":40,"inscritos":257,"demanda":6.42,"diagnostico":"Sem Evasão","nivel":"N0"},{"unidade":"Etec de Santa Isabel","curso":"Administração - MTec-PI","turma":"Turma A","vagas":35,"inscritos":185,"demanda":5.29,"diagnostico":"Sem Evasão","nivel":"N0"},{"unidade":"Etec João Gomes de Araújo","curso":"Administração - MTec-PI","turma":"Turma A","vagas":40,"inscritos":162,"demanda":4.05,"diagnostico":"Sem Evasão","nivel":"N0"},{"unidade":"Etec Presidente Vargas","curso":"Química - MTec","turma":"Turma A","vagas":40,"inscritos":347,"demanda":8.68,"diagnostico":"Sem Evasão","nivel":"N0"}]}}};
+
+let currentRegional = 'TODAS';
+let donutChart, barChart;
+
+function getStats(reg) {
+  if (reg === 'TODAS') return DATA.totais;
+  return DATA.regionais[reg];
+}
+
+function setRegional(reg, el) {
+  document.querySelectorAll('.filter-item').forEach(i => i.classList.remove('active'));
+  el.classList.add('active');
+  currentRegional = reg;
+  updateDashboard(reg);
+}
+
+function updateDashboard(reg) {
+  const s = getStats(reg);
+  const name = reg === 'TODAS' ? 'Todas as Regionais' : reg;
+
+  document.getElementById('hero-title').textContent = reg === 'TODAS' ? 'Visão Geral — Todas as Regionais' : 'Regional: ' + reg;
+  document.getElementById('hero-regional').textContent = name;
+  document.getElementById('badge-alerta').textContent = s.alerta;
+  document.getElementById('kpi-n3').textContent = s.n3;
+  document.getElementById('kpi-n2').textContent = s.n2;
+  document.getElementById('kpi-n1').textContent = s.n1;
+  document.getElementById('kpi-n0').textContent = s.n0;
+  document.getElementById('table-chip').textContent = name + ' — ' + s.total + ' turmas';
+
+  if (reg === 'TODAS') {
+    document.getElementById('story-title').textContent = 'Unidade mais crítica do estado';
+    document.getElementById('story-body').textContent = 'A Etec Getúlio Vargas (Grande SP Sul/Baixada Santista) concentra 18 turmas em alerta, sendo a unidade mais crítica do estado. Grande SP Sul/BS lidera o ranking regional com 116 turmas em alerta de 281 totais (41,3%).';
+    document.getElementById('story-body2').textContent = 'Ao total, 746 turmas estão em nível de alerta (N3 + N2) de 1.878 analisadas em 12 núcleos regionais — 39,7% do total.';
+    document.getElementById('bar-section').style.display = '';
+  } else {
+    const d = DATA.regionais[reg];
+    document.getElementById('story-title').textContent = d.top_unidade + ' exige atenção imediata';
+    document.getElementById('story-body').textContent = 'Dentro desta regional, ' + d.top_unidade + ' concentra ' + d.top_count + ' turma(s) em alerta (N3 + N2). A regional possui ' + d.alerta + ' turmas em alerta de ' + d.total + ' totais (' + Math.round(d.alerta/d.total*100) + '% do total).';
+    document.getElementById('story-body2').textContent = 'Use a tabela abaixo para navegação detalhada por unidade, curso e turma.';
+    document.getElementById('bar-section').style.display = 'none';
+  }
+
+  updateDonut(s);
+  updateTable(reg);
+}
+
+function updateDonut(s) {
+  const d = donutChart.data.datasets[0];
+  d.data = [s.n3, s.n2, s.n1, s.n0];
+  donutChart.update();
+}
+
+function updateTable(reg) {
+  const tbody = document.getElementById('table-body');
+  let rows;
+  if (reg === 'TODAS') {
+    rows = [];
+    Object.values(DATA.regionais).forEach(r => rows.push(...r.rows.slice(0,3)));
+    rows = rows.slice(0, 24);
+  } else {
+    rows = DATA.regionais[reg].rows;
+  }
+
+  const pillLabel = {N3:'N3 Crítico',N2:'N2 Atenção',N1:'N1 Estável',N0:'N0 OK'};
+
+  tbody.innerHTML = rows.map(r => {
+    const pct = Math.min(r.demanda / 15, 1) * 100;
+    return `<tr>
+      <td style="max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${r.unidade}">${r.unidade}</td>
+      <td style="max-width:160px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${r.curso}">${r.curso}</td>
+      <td>${r.turma}</td>
+      <td>${r.vagas}</td>
+      <td>${r.inscritos}</td>
+      <td>
+        <div class="demanda-bar">
+          <span style="font-size:12px;min-width:28px">${r.demanda.toFixed(1)}</span>
+          <div class="demanda-track"><div class="demanda-fill" style="width:${pct}%"></div></div>
+        </div>
+      </td>
+      <td><span class="pill pill-${r.nivel}">${pillLabel[r.nivel]}</span></td>
+    </tr>`;
+  }).join('');
+}
+
+window.addEventListener('load', () => {
+  const donutCtx = document.getElementById('donutChart');
+  donutChart = new Chart(donutCtx, {
+    type: 'doughnut',
+    data: {
+      labels: ['N3 Crítico','N2 Atenção','N1 Estável','N0 Sem Evasão'],
+      datasets: [{
+        data: [284, 462, 982, 150],
+        backgroundColor: ['#9f2b1a','#a06300','#3a6b43','#546070'],
+        borderWidth: 3,
+        borderColor: '#fffcf7',
+        hoverOffset: 6
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      cutout: '68%',
+      plugins: { legend: { display: false }, tooltip: {
+        callbacks: { label: ctx => ' ' + ctx.label + ': ' + ctx.parsed }
+      }}
+    }
+  });
+
+  const regs = Object.keys(DATA.regionais);
+  const shortNames = ['Bauru/Araç.','Camp. Norte','Camp. Sul','SP Leste','SP Noroeste','SP Sul/BS','Itapeva','Marília','Ribeirão','SJRP','Sorocaba','Vale Paraíba'];
+  const alertas = regs.map(r => DATA.regionais[r].alerta);
+
+  const barCtx = document.getElementById('barChart');
+  barChart = new Chart(barCtx, {
+    type: 'bar',
+    data: {
+      labels: shortNames,
+      datasets: [{
+        label: 'Turmas em alerta',
+        data: alertas,
+        backgroundColor: alertas.map(v => v >= 97 ? '#9f2b1a' : v >= 60 ? '#a06300' : '#546070'),
+        borderRadius: 5,
+        borderSkipped: false
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => ' ' + ctx.parsed.y + ' turmas em alerta' } } },
+      scales: {
+        x: { ticks: { font: { size: 11 }, color: '#8a7460', autoSkip: false, maxRotation: 35 }, grid: { display: false } },
+        y: { ticks: { font: { size: 11 }, color: '#8a7460' }, grid: { color: 'rgba(180,155,110,0.15)' } }
+      }
+    }
+  });
+
+  updateTable('TODAS');
+});
+</script>
+</body>
+</html>
