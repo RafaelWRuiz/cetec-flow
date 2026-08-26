@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import * as d3 from 'd3'
 import { MUN_BY_REGIONAL, REGIONAIS, SAO_PAULO_FALLBACK_LOCATIONS, SAO_PAULO_UNIT_LOCATIONS, SP_BORDER, type MapFeatureCollection } from '../data/aredMapData'
 import type { EtecPoint } from '../data/mockData'
@@ -21,9 +21,9 @@ const hasDarkBackground = (color: string) => {
   return (r * 0.2126 + g * 0.7152 + b * 0.0722) < 155
 }
 const EXTERNAL_REGIONAL_LABELS: Record<string, { offsetX: number; offsetY: number; referenceRegional?: string; anchorMunicipality?: string; lines: string[] }> = {
-  'Grande São Paulo Noroeste': { offsetX: 158, offsetY: 62, referenceRegional: 'Grande São Paulo Leste', lines: ['Grande São Paulo Noroeste'] },
-  'Grande São Paulo Leste': { offsetX: 94, offsetY: 88, lines: ['Grande São Paulo Leste'] },
-  'Grande São Paulo Sul/Baixada Santista': { offsetX: 70, offsetY: 168, referenceRegional: 'Grande São Paulo Leste', anchorMunicipality: 'Praia Grande', lines: ['Grande São Paulo Sul/Baixada Santista'] },
+  'Grande São Paulo Noroeste': { offsetX: 132, offsetY: 48, referenceRegional: 'Grande São Paulo Leste', lines: ['Grande São Paulo Noroeste'] },
+  'Grande São Paulo Leste': { offsetX: 76, offsetY: 68, lines: ['Grande São Paulo Leste'] },
+  'Grande São Paulo Sul/Baixada Santista': { offsetX: 54, offsetY: 125, referenceRegional: 'Grande São Paulo Leste', anchorMunicipality: 'Praia Grande', lines: ['Grande São Paulo Sul/Baixada Santista'] },
 }
 
 type MapTheme = {
@@ -114,6 +114,21 @@ export default function D3GeographicMap({ etecs, selected, visible, resetKey, on
   const resetMap = useRef<null | (() => void)>(null)
   const markerState = useRef({ selected, visible })
   const etecsRef = useRef(etecs)
+  const [containerSize, setContainerSize] = useState({ width: 0, height: 0 })
+
+  useEffect(() => {
+    const container = containerRef.current
+    if (!container) return undefined
+    const updateSize = () => {
+      const width = Math.round(container.clientWidth)
+      const height = Math.round(container.clientHeight)
+      setContainerSize((current) => current.width === width && current.height === height ? current : { width, height })
+    }
+    const observer = new ResizeObserver(updateSize)
+    observer.observe(container)
+    updateSize()
+    return () => observer.disconnect()
+  }, [])
 
   useEffect(() => {
     callbacks.current = { onSelect, onGeographicSelect, onGeographicClear }
@@ -134,10 +149,12 @@ export default function D3GeographicMap({ etecs, selected, visible, resetKey, on
     const activeEtecs = etecsRef.current.filter((etec) => markerState.current.visible.includes(etec.name))
     const container = containerRef.current
     if (!container) return undefined
-    const width = Math.max(container.clientWidth, 320)
-    const height = Math.round(width * 0.65)
+    const width = Math.max(containerSize.width || container.clientWidth, 320)
+    const height = Math.max(containerSize.height || container.clientHeight, 220)
     const theme = buildMapTheme(container)
-    const projection = d3.geoMercator().fitExtent([[50, 20], [width - 50, height - 20]], REGIONAIS as d3.ExtendedFeatureCollection)
+    // Reserve space for the external Grande Sao Paulo labels and their guide lines.
+    const stateBottomPadding = Math.max(65, Math.round(height * 0.25))
+    const projection = d3.geoMercator().fitExtent([[50, 20], [width - 50, height - stateBottomPadding]], REGIONAIS as d3.ExtendedFeatureCollection)
     const path = d3.geoPath(projection)
     const svg = d3.select(container).append('svg').attr('viewBox', `0 0 ${width} ${height}`).attr('role', 'img').attr('aria-label', 'Mapa geográfico das Etecs no Estado de São Paulo')
     const tooltip = d3.select(container).append('div').attr('class', 'ared-map-tooltip')
@@ -312,14 +329,14 @@ export default function D3GeographicMap({ etecs, selected, visible, resetKey, on
         const guideColor = rgba(theme.municipalSelectedStroke, 0.66)
         labelLayer.append('line').attr('class', 'ared-reg-label-guide').attr('x1', anchorCenter[0]).attr('y1', anchorCenter[1]).attr('x2', guideEndX).attr('y2', labelY).attr('stroke', guideColor).attr('stroke-width', 1).attr('stroke-dasharray', '3 3').attr('stroke-linecap', 'round').attr('pointer-events', 'none')
         labelLayer.append('circle').attr('class', 'ared-reg-label-anchor').attr('cx', anchorCenter[0]).attr('cy', anchorCenter[1]).attr('r', 3).attr('fill', theme.municipalSelectedStroke).attr('stroke', theme.markerStroke).attr('stroke-width', 1.2).attr('pointer-events', 'none')
-        externalLabel.lines.forEach((line, index) => labelLayer.append('text').attr('class', 'ared-reg-label').attr('x', labelX).attr('y', labelY + (index - (externalLabel.lines.length - 1) / 2) * 13).attr('text-anchor', 'start').style('fill', theme.municipalSelectedStroke).style('stroke', rgba(theme.markerStroke, 0.94)).text(line))
+        externalLabel.lines.forEach((line, index) => labelLayer.append('text').attr('class', 'ared-reg-label ared-reg-label-external').attr('x', labelX).attr('y', labelY + (index - (externalLabel.lines.length - 1) / 2) * 11).attr('text-anchor', 'start').style('fill', theme.municipalSelectedStroke).style('stroke', rgba(theme.markerStroke, 0.94)).text(line))
       } else {
-        parts.forEach((part, index) => labelLayer.append('text').attr('class', 'ared-reg-label').attr('x', center[0]).attr('y', center[1] + (parts.length === 2 ? index * 14 - 7 : 0)).style('fill', labelIsLight ? theme.markerStroke : theme.municipalSelectedStroke).style('stroke', labelIsLight ? rgba(theme.municipalSelectedStroke, 0.58) : rgba(theme.markerStroke, 0.9)).text(part.trim()))
+        parts.forEach((part, index) => labelLayer.append('text').attr('class', 'ared-reg-label').attr('x', center[0]).attr('y', center[1] + (parts.length === 2 ? index * 11 - 5.5 : 0)).style('fill', labelIsLight ? theme.markerStroke : theme.municipalSelectedStroke).style('stroke', labelIsLight ? rgba(theme.municipalSelectedStroke, 0.58) : rgba(theme.markerStroke, 0.9)).text(part.trim()))
       }
     })
     svg.on('click', () => { if (activeRegional) resetZoom() })
     return () => { resetMap.current = null; container.replaceChildren() }
-  }, [resetKey])
+  }, [containerSize, resetKey])
 
   return <div className="ared-map" ref={containerRef} />
 }
