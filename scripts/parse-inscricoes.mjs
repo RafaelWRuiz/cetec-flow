@@ -1,5 +1,6 @@
 import { readFile, writeFile } from 'node:fs/promises'
 import { basename, resolve } from 'node:path'
+import { pathToFileURL } from 'node:url'
 
 const decode = (value) => value.replace(/&nbsp;/gi, ' ').replace(/&aacute;/gi, 'á').replace(/&atilde;/gi, 'ã').replace(/&ccedil;/gi, 'ç').replace(/&eacute;/gi, 'é').replace(/&iacute;/gi, 'í').replace(/&oacute;/gi, 'ó').replace(/&uacute;/gi, 'ú').replace(/&Aacute;/g, 'Á').replace(/&Atilde;/g, 'Ã').replace(/&Ccedil;/g, 'Ç').replace(/&Eacute;/g, 'É').replace(/&Iacute;/g, 'Í').replace(/&Oacute;/g, 'Ó').replace(/&Uacute;/g, 'Ú').replace(/&ordf;/gi, 'ª').replace(/&ordm;/gi, 'º').replace(/&#(d+);/g, (_, n) => String.fromCharCode(Number(n))).replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim()
 const number = (value) => Number(String(value).replaceAll('.', '').replace(',', '.')) || 0
@@ -45,6 +46,6 @@ export function parseInscricoes(html, source = 'source.xls') {
   return { metadata: { edicao: 'Vestibulinho 2026.2', arquivo_origem: source, data_referencia: `${year}-${month}-${day}T${time}:00-03:00`, total_geral: { ...total, demanda: total.vagas ? total.total_inscritos / total.vagas : 0 } }, locais, ofertas }
 }
 
-if (process.argv.length > 3) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href && process.argv.length > 3) {
   const input = resolve(process.argv[2]); const output = resolve(process.argv[3]); const html = await readFile(input, 'latin1'); const snapshot = parseInscricoes(html, basename(input)); await writeFile(output, JSON.stringify(snapshot, null, 2)); console.log(`Snapshot gerado: ${snapshot.locais.length} locais, ${snapshot.ofertas.length} registros`)
 }
