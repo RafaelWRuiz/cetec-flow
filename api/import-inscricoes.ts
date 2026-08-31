@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto'
+import { createHash, timingSafeEqual } from 'node:crypto'
 import { createClient } from '@supabase/supabase-js'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { parseInscricoes } from '../scripts/parse-inscricoes.mjs'
@@ -31,20 +31,24 @@ const json = (body: Record<string, unknown>, status = 200) => new Response(JSON.
 
 const chunk = <T,>(items: T[], size: number) => Array.from({ length: Math.ceil(items.length / size) }, (_, index) => items.slice(index * size, index * size + size))
 
+const passwordMatches = (expected: string, supplied: string) => {
+  const expectedBuffer = Buffer.from(expected)
+  const suppliedBuffer = Buffer.from(supplied)
+  return expectedBuffer.length === suppliedBuffer.length && timingSafeEqual(expectedBuffer, suppliedBuffer)
+}
+
 async function handle(request: Request) {
   if (request.method !== 'POST') return json({ error: 'Método não permitido.' }, 405)
 
   const url = process.env.SUPABASE_URL
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-  const allowedEmails = (process.env.CETEC_IMPORTER_EMAILS ?? '').split(',').map((email) => email.trim().toLowerCase()).filter(Boolean)
-  const token = request.headers.get('authorization')?.replace(/^Bearer\s+/i, '')
+  const importPassword = process.env.CETEC_IMPORT_PASSWORD
+  const suppliedPassword = request.headers.get('x-import-password') ?? ''
 
-  if (!url || !serviceRoleKey || !allowedEmails.length) return json({ error: 'Importação ainda não foi configurada no servidor.' }, 503)
-  if (!token) return json({ error: 'Faça login para importar uma planilha.' }, 401)
+  if (!url || !serviceRoleKey || !importPassword) return json({ error: 'Importação ainda não foi configurada no servidor.' }, 503)
+  if (!passwordMatches(importPassword, suppliedPassword)) return json({ error: 'Senha de importação inválida.' }, 401)
 
   const supabase = createClient(url, serviceRoleKey, { auth: { autoRefreshToken: false, persistSession: false } })
-  const { data: { user }, error: authError } = await supabase.auth.getUser(token)
-  if (authError || !user?.email || !allowedEmails.includes(user.email.toLowerCase())) return json({ error: 'Este usuário não tem permissão para importar planilhas.' }, 403)
 
   const contentLength = Number(request.headers.get('content-length') ?? 0)
   if (contentLength > MAX_FILE_BYTES) return json({ error: 'A planilha ultrapassa o limite de 5 MB.' }, 413)
