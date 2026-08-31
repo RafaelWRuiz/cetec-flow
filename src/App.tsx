@@ -107,22 +107,30 @@ export default function App(){
 <section className="dashboard-top">
 <section className="kpi-row consolidated-kpis">
 <article className="kpi-card enrollment-kpi">
-<div className="enrollment-copy"><p>Inscrições: <b>{number.format(total)} total</b></p><span>{number.format(totals.paid)} pagos · {total?`${Math.round(totals.paid/total*100)}%`:'0%'}</span><small>{number.format(totals.trainee)} treineiros</small></div>
-<div className="mini-gauge enrollment-gauge" style={{'--gauge':`${total?totals.paid/total*180:0}deg`} as React.CSSProperties}><div><strong>{total?`${Math.round(totals.paid/total*100)}%`:'0%'}</strong><span>pagos</span></div></div>
+<div className="enrollment-copy">
+<p>Inscrições</p>
+<strong>{number.format(total)}</strong>
+<div className="enrollment-progress" role="progressbar" aria-label={`Inscrições: ${total?Math.round(totals.paid/total*100):0}% pagos e ${total?Math.round(totals.trainee/total*100):0}% treineiros`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={total?Math.round((totals.paid+totals.trainee)/total*100):0}>
+<i className="enrollment-progress-paid" style={{width:`${total?totals.paid/total*100:0}%`}}/>
+<i className="enrollment-progress-trainee" style={{width:`${total?totals.trainee/total*100:0}%`}}/>
+</div>
+<div className="enrollment-metrics">
+<span className="enrollment-metric paid"><i aria-hidden="true"/>{number.format(totals.paid)} pagos ({total?`${Math.round(totals.paid/total*100)}%`:'0%'})</span>
+<span className="enrollment-metric trainee"><i aria-hidden="true"/>{number.format(totals.trainee)} treineiros ({total?`${(totals.trainee/total*100).toFixed(1)}%`:'0%'})</span>
+</div>
+</div>
 </article>
 <article className="kpi-card demand-kpi">
-<div className="demand-copy"><p>Vagas e demanda</p><div className="demand-values"><strong>{number.format(totals.vacancies)} <small>vagas</small></strong></div><small>{number.format(totals.regular)} pagos</small></div>
-<div className="mini-gauge demand-gauge" style={{'--gauge':`${Math.min(180,Math.max(0,(totals.vacancies?totals.regular/totals.vacancies:0)/2*180))}deg`} as React.CSSProperties}><div><strong>{totals.vacancies?`${(totals.regular/totals.vacancies).toFixed(1)}x`:'0x'}</strong><span>demanda</span></div></div>
+<div className="demand-copy"><p>Vagas e demanda</p><div className="demand-values"><strong>{number.format(totals.vacancies)}</strong><small>vagas disponíveis</small></div><small>{number.format(totals.regular)} inscritos pagos sem treineiros</small></div>
+<div className="demand-badge" aria-label={`${totals.vacancies?`${(totals.regular/totals.vacancies).toFixed(1)}x`:'0x'} candidatos por vaga`}><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg><div><strong>{totals.vacancies?`${(totals.regular/totals.vacancies).toFixed(1)}x`:'0x'}</strong><span>candidato/vaga</span></div></div>
 </article>
 <article className="kpi-card offer-status-kpi">
 <div className="kpi-status-heading">
 <p>Situação das ofertas</p>
-<small>{number.format(regularOfferCount)} regulares</small>
+<small>{number.format(regularOfferCount)} turmas</small>
 </div>
 <div className="status-list">{offerStatus.map(([label,value,tone],index)=>{const percentage=regularOfferCount?value/regularOfferCount*100:0;const roundedPercentage=Math.round(percentage);return <button type="button" key={label} className={`${tone}${statusFilter===(['comfortable','attention','low'] as OfferStatus[])[index]?' active':''}`} onClick={()=>{const next=(['comfortable','attention','low'] as OfferStatus[])[index];setStatusFilter(current=>current===next?null:next)}}>
-<i className={`status ${tone}`}/>
-<span>{label}</span>
-<strong>{number.format(value)}</strong>
+<div className="status-value"><strong data-label={label}>{number.format(value)}</strong></div>
 <div className="status-progress" role="progressbar" aria-label={`${label}: ${roundedPercentage}% das ofertas`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={roundedPercentage}><i style={{width:`${percentage}%`}}/><span className="status-progress-label" style={{left:`${percentage/2}%`}}>{roundedPercentage}%</span></div>
 </button>})}</div>
 </article>
