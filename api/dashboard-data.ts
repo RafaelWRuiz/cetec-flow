@@ -1,6 +1,6 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import { asWebRequest, sendWebResponse } from './http'
+import { asWebRequest, sendWebResponse } from './http.mjs'
 
 type ImportRecord = { id: string; edition: string; source_file_name: string; reference_at: string }
 type SnapshotRow = { local_code: string; municipality: string | null; etec_name: string | null; regional: string | null; course: string; period: string; vacancies: number; paid: number; unpaid: number; is_trainee: boolean }

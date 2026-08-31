@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto'
 import { createClient } from '@supabase/supabase-js'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { parseInscricoes } from '../scripts/parse-inscricoes.mjs'
-import { asWebRequest, sendWebResponse } from './http'
+import { asWebRequest, sendWebResponse } from './http.mjs'
 
 const MAX_FILE_BYTES = 5 * 1024 * 1024
 const BUCKET = 'cetec-flow-imports'

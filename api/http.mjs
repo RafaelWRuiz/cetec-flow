@@ -1,17 +1,14 @@
 import { Buffer } from 'node:buffer'
-import type { IncomingMessage, ServerResponse } from 'node:http'
 
-type ApiRequest = Request | IncomingMessage
+const hasWebRequestShape = (request) => typeof request.arrayBuffer === 'function'
 
-const hasWebRequestShape = (request: ApiRequest): request is Request => typeof (request as Request).arrayBuffer === 'function'
-
-async function readBody(request: IncomingMessage) {
-  const chunks: Buffer[] = []
+async function readBody(request) {
+  const chunks = []
   for await (const chunk of request) chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk))
   return Buffer.concat(chunks)
 }
 
-function headersFor(request: IncomingMessage) {
+function headersFor(request) {
   const headers = new Headers()
   Object.entries(request.headers).forEach(([name, value]) => {
     if (Array.isArray(value)) value.forEach((entry) => headers.append(name, entry))
@@ -20,7 +17,7 @@ function headersFor(request: IncomingMessage) {
   return headers
 }
 
-export async function asWebRequest(request: ApiRequest) {
+export async function asWebRequest(request) {
   if (hasWebRequestShape(request)) return request
 
   const host = request.headers.host ?? 'localhost'
@@ -33,7 +30,7 @@ export async function asWebRequest(request: ApiRequest) {
   })
 }
 
-export async function sendWebResponse(response: Response, nodeResponse?: ServerResponse) {
+export async function sendWebResponse(response, nodeResponse) {
   if (!nodeResponse) return response
 
   nodeResponse.statusCode = response.status
