@@ -19,6 +19,7 @@ pnpm-debug.log*
 *.temp
 tmp/
 temp/
+output/
 
 # Local configuration and credentials
 .env

@@ -28,12 +28,11 @@ async function handle(request: Request) {
   if (activeError) return json({ error: 'Não foi possível carregar a versão ativa.' }, 500)
   if (!active) return json({ snapshots: null })
 
-  const { data: previous, error: previousError } = await supabase.from('cetec_imports').select('id, edition, source_file_name, reference_at').eq('edition', active.edition).eq('status', 'completed').neq('id', active.id).order('reference_at', { ascending: false }).limit(1).maybeSingle<ImportRecord>()
-  if (previousError) return json({ error: 'Não foi possível carregar o histórico.' }, 500)
+  const { data: imports, error: importsError } = await supabase.from('cetec_imports').select('id, edition, source_file_name, reference_at').eq('edition', active.edition).eq('status', 'completed').order('reference_at', { ascending: true }).returns<ImportRecord[]>()
+  if (importsError) return json({ error: 'Não foi possível carregar o histórico.' }, 500)
 
   try {
-    const imports = [previous, active].filter(Boolean) as ImportRecord[]
-    const loaded = await Promise.all(imports.map(async (item) => ({ item, rows: await loadRows(supabase, item.id) })))
+    const loaded = await Promise.all((imports ?? []).map(async (item) => ({ item, rows: await loadRows(supabase, item.id) })))
     const current = loaded.at(-1)!
     const etecs = [...new Map(current.rows.map((row) => [row.local_code, { name: row.local_code, label: `${row.etec_name ?? row.local_code} (${row.local_code})`, city: row.municipality ?? '', municipality: row.municipality ?? '', regional: row.regional ?? '', x: 0, y: 0 }])).values()]
     const snapshots = loaded.map(({ item, rows }) => ({ referenceAt: item.reference_at, enrollments: rows.map((row) => ({ etec: row.local_code, regional: row.regional ?? '', modality: 'Não informado no arquivo', course: row.course, period: row.period, paid: row.paid, unpaid: row.unpaid, vacancies: row.vacancies, demand: row.vacancies ? (row.paid + row.unpaid) / row.vacancies : 0, target: 0, daily: [], isTrainee: row.is_trainee })) }))

@@ -3,7 +3,7 @@ import * as d3 from 'd3'
 import { MUN_BY_REGIONAL, REGIONAIS, SAO_PAULO_FALLBACK_LOCATIONS, SAO_PAULO_UNIT_LOCATIONS, SP_BORDER, type MapFeatureCollection } from '../data/aredMapData'
 import type { EtecPoint } from '../data/mockData'
 
-type MapProps = { etecs: EtecPoint[]; selected: string; visible: string[]; resetKey: number; onSelect: (name: string) => void; onGeographicSelect: (label: string, etecs: string[]) => void; onGeographicClear: () => void }
+type MapProps = { etecs: EtecPoint[]; selected: string; visible: string[]; focusedRegional: string; resetKey: number; onSelect: (name: string) => void; onGeographicSelect: (label: string, etecs: string[]) => void; onGeographicClear: () => void }
 type Feature = MapFeatureCollection['features'][number]
 type UnitPoint = { etec: EtecPoint; x: number; y: number; originX: number; originY: number }
 const normalize = (value: string) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
@@ -108,10 +108,11 @@ function radialize(points: UnitPoint[], anchor: [number, number]) {
   return points.map((point, index) => ({ ...point, x: anchor[0] + Math.cos(-Math.PI / 2 + Math.PI * 2 * index / points.length) * radius, y: anchor[1] + Math.sin(-Math.PI / 2 + Math.PI * 2 * index / points.length) * radius }))
 }
 
-export default function D3GeographicMap({ etecs, selected, visible, resetKey, onSelect, onGeographicSelect, onGeographicClear }: MapProps) {
+export default function D3GeographicMap({ etecs, selected, visible, focusedRegional, resetKey, onSelect, onGeographicSelect, onGeographicClear }: MapProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const callbacks = useRef({ onSelect, onGeographicSelect, onGeographicClear })
   const resetMap = useRef<null | (() => void)>(null)
+  const focusRegional = useRef<null | ((regional: string) => void)>(null)
   const markerState = useRef({ selected, visible })
   const etecsRef = useRef(etecs)
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 })
@@ -143,6 +144,8 @@ export default function D3GeographicMap({ etecs, selected, visible, resetKey, on
   }, [etecs])
 
   useEffect(() => { resetMap.current?.() }, [resetKey])
+
+  useEffect(() => { focusRegional.current?.(focusedRegional) }, [focusedRegional])
 
   useEffect(() => {
     // Filter changes rebuild the map; geographic drill-down keeps its current view.
@@ -299,6 +302,13 @@ export default function D3GeographicMap({ etecs, selected, visible, resetKey, on
       callbacks.current.onGeographicSelect(regional, regionalUnits(regional).map((unit) => unit.name))
     }
 
+    focusRegional.current = (regional) => {
+      if (!regional) { resetZoom(); return }
+      const feature = REGIONAIS.features.find((item) => String(item.properties.regional ?? '') === regional)
+      if (!feature) return
+      zoomToRegional(regional, theme.regionalPalette[regional] ?? String(feature.properties.cor ?? '#005C6D'))
+    }
+
     REGIONAIS.features.forEach((feature) => {
       const regional = String(feature.properties.regional ?? '')
       const color = theme.regionalPalette[regional] ?? String(feature.properties.cor ?? '#005C6D')
@@ -335,7 +345,8 @@ export default function D3GeographicMap({ etecs, selected, visible, resetKey, on
       }
     })
     svg.on('click', () => { if (activeRegional) resetZoom() })
-    return () => { resetMap.current = null; container.replaceChildren() }
+    if (focusedRegional) focusRegional.current(focusedRegional)
+    return () => { resetMap.current = null; focusRegional.current = null; container.replaceChildren() }
   }, [containerSize, resetKey])
 
   return <div className="ared-map" ref={containerRef} />

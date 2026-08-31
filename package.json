@@ -27,6 +27,7 @@
   "devDependencies": {
     "@types/node": "26.4.0",
     "@types/react": "latest",
-    "@types/react-dom": "latest"
+    "@types/react-dom": "latest",
+    "playwright": "^1.62.1"
   }
 }
