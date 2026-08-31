@@ -1,6 +1,8 @@
 import { createHash } from 'node:crypto'
 import { createClient } from '@supabase/supabase-js'
+import type { IncomingMessage, ServerResponse } from 'node:http'
 import { parseInscricoes } from '../scripts/parse-inscricoes.mjs'
+import { asWebRequest, sendWebResponse } from './http'
 
 const MAX_FILE_BYTES = 5 * 1024 * 1024
 const BUCKET = 'cetec-flow-imports'
@@ -29,7 +31,7 @@ const json = (body: Record<string, unknown>, status = 200) => new Response(JSON.
 
 const chunk = <T,>(items: T[], size: number) => Array.from({ length: Math.ceil(items.length / size) }, (_, index) => items.slice(index * size, index * size + size))
 
-export default async function handler(request: Request) {
+async function handle(request: Request) {
   if (request.method !== 'POST') return json({ error: 'Método não permitido.' }, 405)
 
   const url = process.env.SUPABASE_URL
@@ -132,4 +134,8 @@ export default async function handler(request: Request) {
     records: snapshot.ofertas.length,
     totals: { paid: total.pagos, unpaid: total.nao_pagos, enrolled: total.total_inscritos },
   })
+}
+
+export default async function handler(request: Request | IncomingMessage, response?: ServerResponse) {
+  return sendWebResponse(await handle(await asWebRequest(request)), response)
 }

@@ -1,4 +1,6 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+import type { IncomingMessage, ServerResponse } from 'node:http'
+import { asWebRequest, sendWebResponse } from './http'
 
 type ImportRecord = { id: string; edition: string; source_file_name: string; reference_at: string }
 type SnapshotRow = { local_code: string; municipality: string | null; etec_name: string | null; regional: string | null; course: string; period: string; vacancies: number; paid: number; unpaid: number; is_trainee: boolean }
@@ -15,7 +17,7 @@ async function loadRows(supabase: SupabaseClient, importId: string) {
   }
 }
 
-export default async function handler(request: Request) {
+async function handle(request: Request) {
   if (request.method !== 'GET') return json({ error: 'Método não permitido.' }, 405)
   const url = process.env.SUPABASE_URL
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -39,4 +41,8 @@ export default async function handler(request: Request) {
   } catch {
     return json({ error: 'Não foi possível carregar os dados da versão ativa.' }, 500)
   }
+}
+
+export default async function handler(request: Request | IncomingMessage, response?: ServerResponse) {
+  return sendWebResponse(await handle(await asWebRequest(request)), response)
 }
