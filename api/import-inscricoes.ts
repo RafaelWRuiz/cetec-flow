@@ -1,7 +1,7 @@
 import { createHash, timingSafeEqual } from 'node:crypto'
 import { createClient } from '@supabase/supabase-js'
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import { parseInscricoes } from '../scripts/parse-inscricoes.mjs'
+import { parseInscricoes, parseInscricoesXlsx } from '../scripts/parse-inscricoes.mjs'
 import { asWebRequest, sendWebResponse } from './http.mjs'
 
 const MAX_FILE_BYTES = 5 * 1024 * 1024
@@ -53,8 +53,8 @@ async function handle(request: Request) {
   const contentLength = Number(request.headers.get('content-length') ?? 0)
   if (contentLength > MAX_FILE_BYTES) return json({ error: 'A planilha ultrapassa o limite de 5 MB.' }, 413)
 
-  const fileName = decodeURIComponent(request.headers.get('x-file-name') ?? 'importacao.xls')
-  if (!/\.xls$/i.test(fileName)) return json({ error: 'Envie a exportação .xls do Vestibulinho.' }, 415)
+  const fileName = decodeURIComponent(request.headers.get('x-file-name') ?? 'importacao.xlsx')
+  if (!/\.xlsx?$/i.test(fileName)) return json({ error: 'Envie a exportação .xls ou .xlsx do Vestibulinho.' }, 415)
 
   const file = Buffer.from(await request.arrayBuffer())
   if (!file.length) return json({ error: 'A planilha está vazia.' }, 400)
@@ -62,7 +62,9 @@ async function handle(request: Request) {
 
   let snapshot: ReturnType<typeof parseInscricoes>
   try {
-    snapshot = parseInscricoes(file.toString('latin1'), fileName)
+    snapshot = /\.xlsx$/i.test(fileName)
+      ? await parseInscricoesXlsx(file, fileName)
+      : parseInscricoes(file.toString('latin1'), fileName)
   } catch (error) {
     return json({ error: error instanceof Error ? error.message : 'Não foi possível ler a planilha.' }, 422)
   }
@@ -75,9 +77,12 @@ async function handle(request: Request) {
   if (duplicate) return json({ error: `Esta mesma planilha já foi importada em ${new Date(duplicate.reference_at).toLocaleString('pt-BR')}.` }, 409)
 
   const editionPath = snapshot.metadata.edicao.toLowerCase().replace(/[^a-z0-9]+/g, '-')
-  const sourcePath = `${editionPath}/${new Date().toISOString()}-${checksum.slice(0, 12)}.xls`
+  const extension = /\.xlsx$/i.test(fileName) ? 'xlsx' : 'xls'
+  const sourcePath = `${editionPath}/${new Date().toISOString()}-${checksum.slice(0, 12)}.${extension}`
   const { error: uploadError } = await supabase.storage.from(BUCKET).upload(sourcePath, file, {
-    contentType: 'application/vnd.ms-excel',
+    contentType: extension === 'xlsx'
+      ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      : 'application/vnd.ms-excel',
     upsert: false,
   })
   if (uploadError) return json({ error: 'Não foi possível salvar o arquivo original.' }, 500)
