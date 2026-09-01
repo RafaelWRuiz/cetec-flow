@@ -21,9 +21,9 @@ const hasDarkBackground = (color: string) => {
   return (r * 0.2126 + g * 0.7152 + b * 0.0722) < 155
 }
 const EXTERNAL_REGIONAL_LABELS: Record<string, { offsetX: number; offsetY: number; referenceRegional?: string; anchorMunicipality?: string; lines: string[] }> = {
-  'Grande São Paulo Noroeste': { offsetX: 132, offsetY: 48, referenceRegional: 'Grande São Paulo Leste', lines: ['Grande São Paulo Noroeste'] },
-  'Grande São Paulo Leste': { offsetX: 76, offsetY: 68, lines: ['Grande São Paulo Leste'] },
-  'Grande São Paulo Sul/Baixada Santista': { offsetX: 54, offsetY: 125, referenceRegional: 'Grande São Paulo Leste', anchorMunicipality: 'Praia Grande', lines: ['Grande São Paulo Sul/Baixada Santista'] },
+  'Grande São Paulo Noroeste': { offsetX: 78, offsetY: 16, referenceRegional: 'Grande São Paulo Leste', lines: ['Grande São Paulo Noroeste'] },
+  'Grande São Paulo Leste': { offsetX: 46, offsetY: 28, lines: ['Grande São Paulo Leste'] },
+  'Grande São Paulo Sul/Baixada Santista': { offsetX: 30, offsetY: 48, referenceRegional: 'Grande São Paulo Leste', anchorMunicipality: 'Praia Grande', lines: ['Grande São Paulo Sul/Baixada Santista'] },
 }
 
 type MapTheme = {
@@ -155,9 +155,9 @@ export default function D3GeographicMap({ etecs, selected, visible, focusedRegio
     const width = Math.max(containerSize.width || container.clientWidth, 320)
     const height = Math.max(containerSize.height || container.clientHeight, 220)
     const theme = buildMapTheme(container)
-    // Reserve space for the external Grande Sao Paulo labels and their guide lines.
-    const stateBottomPadding = Math.max(65, Math.round(height * 0.25))
-    const projection = d3.geoMercator().fitExtent([[50, 20], [width - 50, height - stateBottomPadding]], REGIONAIS as d3.ExtendedFeatureCollection)
+    // Keep a compact label zone so the state itself uses the available map height.
+    const stateBottomPadding = Math.max(20, Math.round(height * 0.07))
+    const projection = d3.geoMercator().fitExtent([[20, 8], [width - 20, height - stateBottomPadding]], REGIONAIS as d3.ExtendedFeatureCollection)
     const path = d3.geoPath(projection)
     const svg = d3.select(container).append('svg').attr('viewBox', `0 0 ${width} ${height}`).attr('role', 'img').attr('aria-label', 'Mapa geográfico das Etecs no Estado de São Paulo')
     const tooltip = d3.select(container).append('div').attr('class', 'ared-map-tooltip')
