@@ -91,14 +91,14 @@ function TrendChart({data,target}:{data:ChartData;target:number}){
 </div>
 }
 function CourseChart({rows,period,onPeriodChange}:{rows:CourseRow[];period:CoursePeriod;onPeriodChange:(period:CoursePeriod)=>void}){
- const max=Math.max(...rows.map(row=>Math.max(row.paid+row.unpaid,row.vacancies*1.5)),1); const magnitude=10**Math.floor(Math.log10(max)); const normalized=max/magnitude; const yMax=(normalized<=1?1:normalized<=2?2:normalized<=5?5:10)*magnitude; const yTicks=Array.from({length:5},(_,index)=>yMax-index*yMax/4); const axisLabel=(value:number)=>value>=1000?`${number.format(value/1000)} mil`:number.format(value)
+ const max=Math.max(...rows.map(row=>Math.max(row.paid+row.unpaid,row.vacancies*1.5)),1)
  const periods:[CoursePeriod,string][]=[['all','Todos'],['morning','Manhã'],['afternoon','Tarde'],['night','Noite']]
  return <div className="course-chart">
-<div className="course-chart-legend"><span className="course-chart-paid">Pagos por demanda</span><span className="course-chart-unpaid">Não pagos</span><span className="course-chart-target">Meta de 1,5x</span></div>
-<div className="course-plot-shell"><div className="course-y-axis" aria-hidden="true"><b>Inscritos</b>{yTicks.map(value=><span key={value}>{axisLabel(value)}</span>)}</div><div className="course-plot" role="img" aria-label="Inscritos pagos, não pagos e meta por curso">
-{rows.map(row=>{const paidHeight=row.paid/yMax*100;const unpaidHeight=row.unpaid/yMax*100;const targetHeight=Math.min(row.vacancies*1.5/yMax*100,100);const demand=row.vacancies?(row.paid+row.unpaid)/row.vacancies:null;const status=demand===null?'low':demand>=1.5?'comfortable':demand>=1?'attention':'low';return <div className="course-bar-group" key={row.course}><div className="course-bar-values"><b>{number.format(row.paid+row.unpaid)}</b><span>{demand===null?'N/A':`${demand.toFixed(1)}x`}</span></div><div className="course-bar-track"><i className={`course-bar-paid demand-${status}`} style={{height:`${paidHeight}%`}}/><i className="course-bar-unpaid" style={{bottom:`${paidHeight}%`,height:`${unpaidHeight}%`}}/><i className="course-bar-target" style={{bottom:`${targetHeight}%`}}/></div><span className="course-bar-label" title={row.course}>{compactCourseName(row.course)}</span><small>{number.format(row.vacancies)} vagas</small></div>})}
+<div className="course-chart-legend"><span className="course-chart-paid">Pagos</span><span className="course-chart-unpaid">Não pagos</span><span className="course-chart-target">Meta de 1,5x</span></div>
+<div className="course-plot" role="img" aria-label="Inscritos pagos, não pagos e meta por curso">
+{rows.map(row=>{const paidHeight=row.paid/max*100;const unpaidHeight=row.unpaid/max*100;const targetHeight=Math.min(row.vacancies*1.5/max*100,100);const demand=row.vacancies?row.paid/row.vacancies:null;return <div className="course-bar-group" key={row.course}><div className="course-bar-values"><b>{number.format(row.paid+row.unpaid)}</b><span>{demand===null?'N/A':`${demand.toFixed(1)}x`}</span></div><div className="course-bar-track"><i className="course-bar-paid" style={{height:`${paidHeight}%`}}/><i className="course-bar-unpaid" style={{bottom:`${paidHeight}%`,height:`${unpaidHeight}%`}}/><i className="course-bar-target" style={{bottom:`${targetHeight}%`}}/></div><span className="course-bar-label" title={row.course}>{compactCourseName(row.course)}</span><small>{number.format(row.vacancies)} vagas</small></div>})}
 {!rows.length&&<p className="course-empty">Não há cursos para este período no recorte atual.</p>}
-</div></div>
+</div>
 <div className="course-period-tabs" role="tablist" aria-label="Período dos cursos">{periods.map(([value,label])=><button type="button" key={value} role="tab" aria-selected={period===value} className={period===value?'active':''} onClick={()=>onPeriodChange(value)}>{label}</button>)}</div>
 </div>
 }
