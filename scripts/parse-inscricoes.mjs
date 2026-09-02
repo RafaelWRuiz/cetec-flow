@@ -3,6 +3,8 @@ import { basename, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { inflateRawSync } from 'node:zlib'
 
+const EDITION = 'Vestibulinho 2027.1'
+
 const decode = (value) => value.replace(/&nbsp;/gi, ' ').replace(/&aacute;/gi, 'á').replace(/&atilde;/gi, 'ã').replace(/&ccedil;/gi, 'ç').replace(/&eacute;/gi, 'é').replace(/&iacute;/gi, 'í').replace(/&oacute;/gi, 'ó').replace(/&uacute;/gi, 'ú').replace(/&Aacute;/g, 'Á').replace(/&Atilde;/g, 'Ã').replace(/&Ccedil;/g, 'Ç').replace(/&Eacute;/g, 'É').replace(/&Iacute;/g, 'Í').replace(/&Oacute;/g, 'Ó').replace(/&Uacute;/g, 'Ú').replace(/&ordf;/gi, 'ª').replace(/&ordm;/gi, 'º').replace(/&#(d+);/g, (_, n) => String.fromCharCode(Number(n))).replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim()
 const number = (value) => Number(String(value).replaceAll('.', '').replace(',', '.')) || 0
 const cells = (html) => [...html.matchAll(/<t[dh]\b[^>]*>([\s\S]*?)<\/t[dh]>/gi)].map((match) => decode(match[1]))
@@ -46,7 +48,7 @@ const createSnapshot = ({ source, sourceDate, locais, ofertas }) => {
   if (!sourceDate) throw new Error('Data/hora de referência ausente no arquivo; informe-a na importação.')
   const total = ofertas.reduce((sum, item) => ({ vagas: sum.vagas + item.vagas, pagos: sum.pagos + item.pagos, nao_pagos: sum.nao_pagos + item.nao_pagos, total_inscritos: sum.total_inscritos + item.total_inscritos }), { vagas: 0, pagos: 0, nao_pagos: 0, total_inscritos: 0 })
   const [, day, month, year, time] = sourceDate
-  return { metadata: { edicao: 'Vestibulinho 2026.2', arquivo_origem: source, data_referencia: `${year}-${month}-${day}T${time}:00-03:00`, total_geral: { ...total, demanda: total.vagas ? total.total_inscritos / total.vagas : 0 } }, locais, ofertas }
+  return { metadata: { edicao: EDITION, arquivo_origem: source, data_referencia: `${year}-${month}-${day}T${time}:00-03:00`, total_geral: { ...total, demanda: total.vagas ? total.total_inscritos / total.vagas : 0 } }, locais, ofertas }
 }
 
 const decodeXml = (value) => decode(value)
@@ -125,7 +127,7 @@ export function parseInscricoes(html, source = 'source.xls') {
       const values = cells(section); const header = values.indexOf('Curso')
       for (let cursor = header + 7; cursor >= 7 && cursor + 6 < values.length; cursor += 7) {
         const [curso, periodo, vagas, pagos, naoPagos, totalInscritos, demanda] = values.slice(cursor, cursor + 7)
-        if (!curso || curso === 'TOTAL' || periodo === 'Treineiro' || !/^\d+$/.test(vagas)) continue
+        if (!curso || curso === 'TOTAL' || periodo === 'TOTAL' || periodo === 'Treineiro' || !/^\d+$/.test(vagas)) continue
         if (ofertas.some((offer) => offer.codigo_local === codigoCompleto && offer.curso === curso && offer.periodo === periodo)) continue
         ofertas.push(createOffer(codigoCompleto, [curso, periodo, vagas, pagos, naoPagos, totalInscritos, demanda]))
       }
@@ -150,7 +152,7 @@ export async function parseInscricoesXlsx(file, source = 'source.xlsx') {
       const values = rows[rowIndex]
       const [curso, periodo, vagas, pagos, naoPagos, totalInscritos, demanda] = values
       const isTreineiro = curso === 'Treineiro'
-      if (!curso || curso === 'Curso' || curso === 'TOTAL' || !periodo || (!isTreineiro && !/^\d+(?:[.,]\d+)?$/.test(vagas))) continue
+      if (!curso || curso === 'Curso' || curso === 'TOTAL' || periodo === 'TOTAL' || !periodo || (!isTreineiro && !/^\d+(?:[.,]\d+)?$/.test(vagas))) continue
       ofertas.push(createOffer(local.codigo_completo, [curso, periodo, vagas, pagos, naoPagos, totalInscritos, demanda]))
     }
   }
