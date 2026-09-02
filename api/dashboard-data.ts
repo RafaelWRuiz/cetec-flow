@@ -4,6 +4,7 @@ import { asWebRequest, sendWebResponse } from './http.mjs'
 
 type ImportRecord = { id: string; edition: string; source_file_name: string; reference_at: string }
 type SnapshotRow = { local_code: string; municipality: string | null; etec_name: string | null; regional: string | null; course: string; period: string; vacancies: number; paid: number; unpaid: number; is_trainee: boolean }
+const EDITION = 'Vestibulinho 2027.1'
 
 const json = (body: Record<string, unknown>, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'cache-control': 'no-store', 'content-type': 'application/json; charset=utf-8' } })
 
@@ -24,7 +25,7 @@ async function handle(request: Request) {
   if (!url || !serviceRoleKey) return json({ snapshots: null })
 
   const supabase = createClient(url, serviceRoleKey, { auth: { autoRefreshToken: false, persistSession: false } })
-  const { data: active, error: activeError } = await supabase.from('cetec_imports').select('id, edition, source_file_name, reference_at').eq('is_active', true).eq('status', 'completed').order('reference_at', { ascending: false }).limit(1).maybeSingle<ImportRecord>()
+  const { data: active, error: activeError } = await supabase.from('cetec_imports').select('id, edition, source_file_name, reference_at').eq('edition', EDITION).eq('is_active', true).eq('status', 'completed').order('reference_at', { ascending: false }).limit(1).maybeSingle<ImportRecord>()
   if (activeError) return json({ error: 'Não foi possível carregar a versão ativa.' }, 500)
   if (!active) return json({ snapshots: null })
 
