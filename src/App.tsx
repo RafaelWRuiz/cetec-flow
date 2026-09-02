@@ -19,7 +19,10 @@ const compactCourseName=(value:string)=>value.replace(/^Ensino Médio com Habili
 const mapRegionalByMunicipality=new Map(Object.entries(MUN_BY_REGIONAL).flatMap(([regional,data])=>data.features.map(feature=>[normalizeName(String(feature.properties.name??'')),regional])))
 const mapRegionalFallbackByMunicipality=new Map([['campinas','Campinas Sul']])
 type HistoryPoint={referenceAt:string;total:number;paid:number;unpaid:number;trainee:number;regular:number;vacancies:number}; type ChartData=Enrollment[]&{history?:HistoryPoint[]}
+type CoursePeriod='all'|'morning'|'afternoon'|'night'
+type CourseRow={course:string;paid:number;unpaid:number;vacancies:number}
 const offerStatusFor=(item:Enrollment):OfferStatus=>{const demand=item.vacancies?(item.paid+item.unpaid)/item.vacancies:0;return demand>=1.5?'comfortable':demand>=1?'attention':'low'}
+const matchesCoursePeriod=(period:string,scope:CoursePeriod)=>scope==='all'||normalizeName(period).includes(scope==='morning'?'manha':scope==='afternoon'?'tarde':'noite')
 function SelectFilter({label,value,values,onChange,etecOptions=[]}:{label:string;value:string[];values:string[];onChange:(value:string[])=>void;etecOptions?:EtecPoint[]}){
  const [open,setOpen]=useState(false); const [query,setQuery]=useState(''); const filterRef=useRef<HTMLDivElement>(null); const menuId=useId(); const unavailable=values.length===0
  const displayLabel=label==='Etec'?'Local de oferta':label; const rawOptionLabel=(item:string)=>label==='Etec'?(etecOptions.find(etec=>etec.name===item)?.label.replace(/\s*\([^)]*\)\s*$/,'')??item):item; const optionLabel=(item:string)=>label==='Curso'?compactCourseName(rawOptionLabel(item)):rawOptionLabel(item)
@@ -87,8 +90,20 @@ function TrendChart({data,target}:{data:ChartData;target:number}){
 <p className="chart-footnote">Dados acumulados por dia de inscricao</p>
 </div>
 }
+function CourseChart({rows,period,onPeriodChange}:{rows:CourseRow[];period:CoursePeriod;onPeriodChange:(period:CoursePeriod)=>void}){
+ const max=Math.max(...rows.map(row=>Math.max(row.paid+row.unpaid,row.vacancies*1.5)),1)
+ const periods:[CoursePeriod,string][]=[['all','Todos'],['morning','Manhã'],['afternoon','Tarde'],['night','Noite']]
+ return <div className="course-chart">
+<div className="course-chart-legend"><span className="course-chart-paid">Pagos</span><span className="course-chart-unpaid">Não pagos</span><span className="course-chart-target">Meta de 1,5x</span></div>
+<div className="course-plot" role="img" aria-label="Inscritos pagos, não pagos e meta por curso">
+{rows.map(row=>{const paidHeight=row.paid/max*100;const unpaidHeight=row.unpaid/max*100;const targetHeight=Math.min(row.vacancies*1.5/max*100,100);const demand=row.vacancies?row.paid/row.vacancies:null;return <div className="course-bar-group" key={row.course}><div className="course-bar-values"><b>{number.format(row.paid+row.unpaid)}</b><span>{demand===null?'N/A':`${demand.toFixed(1)}x`}</span></div><div className="course-bar-track"><i className="course-bar-paid" style={{height:`${paidHeight}%`}}/><i className="course-bar-unpaid" style={{bottom:`${paidHeight}%`,height:`${unpaidHeight}%`}}/><i className="course-bar-target" style={{bottom:`${targetHeight}%`}}/></div><span className="course-bar-label" title={row.course}>{compactCourseName(row.course)}</span><small>{number.format(row.vacancies)} vagas</small></div>})}
+{!rows.length&&<p className="course-empty">Não há cursos para este período no recorte atual.</p>}
+</div>
+<div className="course-period-tabs" role="tablist" aria-label="Período dos cursos">{periods.map(([value,label])=><button type="button" key={value} role="tab" aria-selected={period===value} className={period===value?'active':''} onClick={()=>onPeriodChange(value)}>{label}</button>)}</div>
+</div>
+}
 export default function App(){
- const [filters,setFilters]=useState<Filters>(initialFilters); const [analysisScope,setAnalysisScope]=useState<AnalysisScope>({presential:true,ead:false,trainees:false}); const [selectedEtec,setSelectedEtec]=useState(''); const [geographicScope,setGeographicScope]=useState<{label:string;etecs:string[]}|null>(null); const [mapResetKey,setMapResetKey]=useState(0); const [analysisTab,setAnalysisTab]=useState<'evolution'|'regional'>('evolution'); const [statusFilter,setStatusFilter]=useState<OfferStatus|null>(null); const [colorMapByStatus,setColorMapByStatus]=useState(false); const [dashboard,setDashboard]=useState<DashboardPayload|null>(null); const [snapshotEndAt,setSnapshotEndAt]=useState(''); const [importOpen,setImportOpen]=useState(false); const [importPassword,setImportPassword]=useState(''); const [importFile,setImportFile]=useState<File|null>(null); const [importMessage,setImportMessage]=useState(''); const [importing,setImporting]=useState(false)
+ const [filters,setFilters]=useState<Filters>(initialFilters); const [analysisScope,setAnalysisScope]=useState<AnalysisScope>({presential:true,ead:false,trainees:false}); const [selectedEtec,setSelectedEtec]=useState(''); const [geographicScope,setGeographicScope]=useState<{label:string;etecs:string[]}|null>(null); const [mapResetKey,setMapResetKey]=useState(0); const [analysisTab,setAnalysisTab]=useState<'evolution'|'courses'>('evolution'); const [coursePeriod,setCoursePeriod]=useState<CoursePeriod>('all'); const [statusFilter,setStatusFilter]=useState<OfferStatus|null>(null); const [colorMapByStatus,setColorMapByStatus]=useState(false); const [dashboard,setDashboard]=useState<DashboardPayload|null>(null); const [snapshotEndAt,setSnapshotEndAt]=useState(''); const [importOpen,setImportOpen]=useState(false); const [importPassword,setImportPassword]=useState(''); const [importFile,setImportFile]=useState<File|null>(null); const [importMessage,setImportMessage]=useState(''); const [importing,setImporting]=useState(false)
  useEffect(()=>{let cancelled=false;void fetch(apiUrl('/api/dashboard-data')).then(async response=>response.ok?readJson<{snapshots?:SnapshotSeries[];etecs?:EtecPoint[]}>(response):null).then(payload=>{if(cancelled)return;setDashboard({etecs:payload?.etecs??[],snapshotSeries:payload?.snapshots??[]})}).catch(()=>{if(!cancelled)setDashboard({etecs:[],snapshotSeries:[]})});return()=>{cancelled=true}},[])
  const {etecs,snapshotSeries}=dashboard??{etecs:[],snapshotSeries:[]}; const rangeStartAt=snapshotSeries.at(0)?.referenceAt||''; const rangeEndAt=snapshotEndAt||snapshotSeries.at(-1)?.referenceAt||''; const visibleSnapshotSeries=snapshotSeries.filter(snapshot=>snapshot.referenceAt>=rangeStartAt&&snapshot.referenceAt<=rangeEndAt); const selectedSnapshot=visibleSnapshotSeries.at(-1)??snapshotSeries.at(-1); const enrollments=selectedSnapshot?.enrollments??[]
  const isEadOffer=(item:Enrollment)=>/\bEAD\b/i.test(item.course)||normalizeName(item.period).includes('ead')||normalizeName(item.period)==='on-line'; const matchesAnalysisScope=(item:Enrollment)=>item.isTrainee?analysisScope.trainees:isEadOffer(item)?analysisScope.ead:analysisScope.presential
@@ -101,6 +116,7 @@ export default function App(){
  const matchesPresentialOfferScope=(item:Enrollment)=>!item.isTrainee&&!isEadOffer(item)&&matchesBaseScope(item)&&matchesStatus(item)
  const scopedHistory=visibleSnapshotSeries.map(({referenceAt,enrollments:items})=>{const scoped=items.filter(matchesActiveScope);const regular=scoped.filter(item=>!item.isTrainee);const paid=regular.reduce((sum,item)=>sum+item.paid,0);const unpaid=regular.reduce((sum,item)=>sum+item.unpaid,0);const trainee=scoped.filter(item=>item.isTrainee).reduce((sum,item)=>sum+item.paid+item.unpaid,0);const vacancies=regular.reduce((sum,item)=>sum+item.vacancies,0);return {referenceAt,total:paid+unpaid+trainee,paid,unpaid,trainee,regular:paid+unpaid,vacancies}})
  const data=Object.assign(enrollments.filter(matchesActiveScope),{history:scopedHistory}) as ChartData
+ const courseRows=[...data.filter(item=>!item.isTrainee&&matchesCoursePeriod(item.period,coursePeriod)).reduce((rows,item)=>{const current=rows.get(item.course)??{course:item.course,paid:0,unpaid:0,vacancies:0};current.paid+=item.paid;current.unpaid+=item.unpaid;current.vacancies+=item.vacancies;rows.set(item.course,current);return rows},new Map<string,CourseRow>()).values()].sort((a,b)=>b.paid-a.paid||a.course.localeCompare(b.course,'pt-BR'))
  const totals=data.reduce((r,item)=>({paid:r.paid+(item.isTrainee?0:item.paid),unpaid:r.unpaid+(item.isTrainee?0:item.unpaid),vacancies:r.vacancies+(item.isTrainee?0:item.vacancies),target:r.target+item.target,trainee:r.trainee+(item.isTrainee?item.paid+item.unpaid:0),regular:r.regular+(item.isTrainee?0:item.paid+item.unpaid)}),{paid:0,unpaid:0,vacancies:0,target:0,trainee:0,regular:0})
  const total=totals.paid+totals.unpaid+totals.trainee
  const presentialOfferData=enrollments.filter(matchesPresentialOfferScope)
@@ -212,10 +228,9 @@ export default function App(){
 </div>
 <div className="analysis-tabs" role="tablist" aria-label="Análises">
 <button type="button" role="tab" aria-selected={analysisTab==='evolution'} className={analysisTab==='evolution'?'active':''} onClick={()=>setAnalysisTab('evolution')}>Evolução</button>
-<button type="button" role="tab" aria-selected={analysisTab==='regional'} className={analysisTab==='regional'?'active':''} onClick={()=>setAnalysisTab('regional')}>{performanceTabLabel}</button>
-{performanceDimension!=='regional'&&<button type="button" className="analysis-back" onClick={goBackPerformanceLevel}>{performanceBackLabel}</button>}
+<button type="button" role="tab" aria-selected={analysisTab==='courses'} className={analysisTab==='courses'?'active':''} onClick={()=>setAnalysisTab('courses')}>Cursos</button>
 </div>
-{analysisTab==='evolution'?<TrendChart data={data} target={totals.target}/>:<div className="regional-table analysis-regional-table">
+{analysisTab==='evolution'?<TrendChart data={data} target={totals.target}/>:<CourseChart rows={courseRows} period={coursePeriod} onPeriodChange={setCoursePeriod}/>}<div className="regional-table analysis-regional-table" hidden>
 <div className="regional-head">
 <span>{performanceColumn}</span>
 <span>Inscritos</span>
@@ -239,7 +254,7 @@ export default function App(){
 <span>{totals.vacancies?`${(totals.regular/totals.vacancies).toFixed(1)}x`:'N/A'}</span>
 <span>{number.format(demandBands.low)} · {regularOfferCount?`${(demandBands.low/regularOfferCount*100).toFixed(1).replace('.',',')}%`:'0,0%'}</span>
 </div>
-</div>}
+</div>
 </article>
 </div>
 </section>

@@ -371,6 +371,20 @@ footer {
 .analysis-tabs button.active { border-bottom-color: var(--cps-blue); color: var(--cps-blue-dark); }
 .analysis-tabs .analysis-back { margin-left: auto; border: 1px solid var(--cps-border); border-radius: 4px; padding: 4px 7px; color: var(--cps-text-secondary); font-size: 10px; }
 .analysis-tabs .analysis-back:hover { border-color: var(--cps-blue); color: var(--cps-blue-dark); background: var(--cps-hover); }
+.course-chart { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; flex: 1; min-height: 0; padding: 10px 14px 12px; }
+.course-chart-legend { display: flex; justify-content: center; gap: 18px; color: var(--cps-text-secondary); font-size: 10px; font-weight: 700; }
+.course-chart-legend span::before { content: ''; display: inline-block; width: 12px; height: 8px; margin-right: 5px; vertical-align: middle; }
+.course-chart-paid::before { background: #18222d; }.course-chart-unpaid::before { background: #1f9d55; }.course-chart-target::before { height: 2px !important; background: var(--cps-cyan); }
+.course-plot { display: flex; align-items: end; gap: 12px; min-height: 240px; padding: 14px 4px 4px; overflow-x: auto; }
+.course-bar-group { display: grid; grid-template-rows: auto 170px auto auto; flex: 0 0 72px; align-items: end; gap: 4px; text-align: center; }
+.course-bar-values { display: grid; gap: 1px; min-height: 32px; color: var(--cps-text); font-size: 10px; }.course-bar-values b { font-size: 12px; }.course-bar-values span { color: var(--cps-text-secondary); }
+.course-bar-track { position: relative; width: 32px; height: 170px; justify-self: center; border: 1px solid var(--cps-border); background: color-mix(in srgb, var(--cps-hover) 65%, var(--cps-surface)); }
+.course-bar-track i { position: absolute; right: 0; left: 0; display: block; }.course-bar-paid { bottom: 0; background: #18222d; }.course-bar-unpaid { background: #1f9d55; }.course-bar-target { z-index: 1; height: 3px; background: var(--cps-cyan); box-shadow: 0 0 0 1px var(--cps-surface); }
+.course-bar-label { display: -webkit-box; overflow: hidden; min-height: 30px; color: var(--cps-text); font-size: 9px; font-weight: 700; line-height: 1.15; text-align: center; -webkit-box-orient: vertical; -webkit-line-clamp: 3; }
+.course-bar-group small { color: var(--cps-text-secondary); font-size: 8px; white-space: nowrap; }
+.course-empty { align-self: center; width: 100%; color: var(--cps-text-secondary); font-size: 12px; text-align: center; }
+.course-period-tabs { display: flex; justify-content: center; gap: 7px; padding-top: 10px; }.course-period-tabs button { min-width: 78px; border: 1px solid var(--cps-border); border-radius: 4px; padding: 6px 10px; color: var(--cps-text-secondary); background: var(--cps-surface); font-size: 10px; font-weight: 700; }.course-period-tabs button:hover, .course-period-tabs button.active { border-color: var(--cps-blue); color: var(--cps-blue-dark); background: var(--cps-hover); }.course-period-tabs button:focus-visible { outline: 2px solid var(--cps-cyan); outline-offset: 2px; }
+@media (max-width: 620px) { .course-period-tabs { justify-content: flex-start; overflow-x: auto; }.course-period-tabs button { min-width: 70px; }.course-plot { min-height: 220px; }.course-bar-group { grid-template-rows: auto 150px auto auto; }.course-bar-track { height: 150px; } }
 .analysis-regional-table { flex: 1; overflow: auto; }
 .analysis-regional-table .regional-line { width: 100%; border-right: 0; border-bottom: 0; border-left: 0; text-align: left; font: inherit; background: transparent; }
 .analysis-regional-table .regional-line.is-drilldown { cursor: pointer; }
