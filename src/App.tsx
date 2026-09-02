@@ -103,7 +103,7 @@ function CourseChart({rows,period,onPeriodChange}:{rows:CourseRow[];period:Cours
 </div>
 }
 export default function App(){
- const [filters,setFilters]=useState<Filters>(initialFilters); const [analysisScope,setAnalysisScope]=useState<AnalysisScope>({presential:true,ead:false,trainees:false}); const [selectedEtec,setSelectedEtec]=useState(''); const [geographicScope,setGeographicScope]=useState<{label:string;etecs:string[]}|null>(null); const [mapResetKey,setMapResetKey]=useState(0); const [analysisTab,setAnalysisTab]=useState<'evolution'|'courses'>('evolution'); const [coursePeriod,setCoursePeriod]=useState<CoursePeriod>('all'); const [statusFilter,setStatusFilter]=useState<OfferStatus|null>(null); const [colorMapByStatus,setColorMapByStatus]=useState(false); const [dashboard,setDashboard]=useState<DashboardPayload|null>(null); const [snapshotEndAt,setSnapshotEndAt]=useState(''); const [importOpen,setImportOpen]=useState(false); const [importPassword,setImportPassword]=useState(''); const [importFile,setImportFile]=useState<File|null>(null); const [importMessage,setImportMessage]=useState(''); const [importing,setImporting]=useState(false)
+ const [filters,setFilters]=useState<Filters>(initialFilters); const [analysisScope,setAnalysisScope]=useState<AnalysisScope>({presential:true,ead:false,trainees:false}); const [selectedEtec,setSelectedEtec]=useState(''); const [geographicScope,setGeographicScope]=useState<{label:string;etecs:string[]}|null>(null); const [mapResetKey,setMapResetKey]=useState(0); const [analysisTab,setAnalysisTab]=useState<'evolution'|'courses'|'performance'>('evolution'); const [coursePeriod,setCoursePeriod]=useState<CoursePeriod>('all'); const [statusFilter,setStatusFilter]=useState<OfferStatus|null>(null); const [colorMapByStatus,setColorMapByStatus]=useState(false); const [dashboard,setDashboard]=useState<DashboardPayload|null>(null); const [snapshotEndAt,setSnapshotEndAt]=useState(''); const [importOpen,setImportOpen]=useState(false); const [importPassword,setImportPassword]=useState(''); const [importFile,setImportFile]=useState<File|null>(null); const [importMessage,setImportMessage]=useState(''); const [importing,setImporting]=useState(false)
  useEffect(()=>{let cancelled=false;void fetch(apiUrl('/api/dashboard-data')).then(async response=>response.ok?readJson<{snapshots?:SnapshotSeries[];etecs?:EtecPoint[]}>(response):null).then(payload=>{if(cancelled)return;setDashboard({etecs:payload?.etecs??[],snapshotSeries:payload?.snapshots??[]})}).catch(()=>{if(!cancelled)setDashboard({etecs:[],snapshotSeries:[]})});return()=>{cancelled=true}},[])
  const {etecs,snapshotSeries}=dashboard??{etecs:[],snapshotSeries:[]}; const rangeStartAt=snapshotSeries.at(0)?.referenceAt||''; const rangeEndAt=snapshotEndAt||snapshotSeries.at(-1)?.referenceAt||''; const visibleSnapshotSeries=snapshotSeries.filter(snapshot=>snapshot.referenceAt>=rangeStartAt&&snapshot.referenceAt<=rangeEndAt); const selectedSnapshot=visibleSnapshotSeries.at(-1)??snapshotSeries.at(-1); const enrollments=selectedSnapshot?.enrollments??[]
  const isEadOffer=(item:Enrollment)=>/\bEAD\b/i.test(item.course)||normalizeName(item.period).includes('ead')||normalizeName(item.period)==='on-line'; const matchesAnalysisScope=(item:Enrollment)=>item.isTrainee?analysisScope.trainees:isEadOffer(item)?analysisScope.ead:analysisScope.presential
@@ -229,8 +229,9 @@ export default function App(){
 <div className="analysis-tabs" role="tablist" aria-label="Análises">
 <button type="button" role="tab" aria-selected={analysisTab==='evolution'} className={analysisTab==='evolution'?'active':''} onClick={()=>setAnalysisTab('evolution')}>Evolução</button>
 <button type="button" role="tab" aria-selected={analysisTab==='courses'} className={analysisTab==='courses'?'active':''} onClick={()=>setAnalysisTab('courses')}>Cursos</button>
+<button type="button" role="tab" aria-selected={analysisTab==='performance'} className={analysisTab==='performance'?'active':''} onClick={()=>setAnalysisTab('performance')}>{performanceTabLabel}</button>
 </div>
-{analysisTab==='evolution'?<TrendChart data={data} target={totals.target}/>:<CourseChart rows={courseRows} period={coursePeriod} onPeriodChange={setCoursePeriod}/>}<div className="regional-table analysis-regional-table" hidden>
+{analysisTab==='evolution'?<TrendChart data={data} target={totals.target}/>:analysisTab==='courses'?<CourseChart rows={courseRows} period={coursePeriod} onPeriodChange={setCoursePeriod}/>:<div className="regional-table analysis-regional-table">
 <div className="regional-head">
 <span>{performanceColumn}</span>
 <span>Inscritos</span>
@@ -255,6 +256,7 @@ export default function App(){
 <span>{number.format(demandBands.low)} · {regularOfferCount?`${(demandBands.low/regularOfferCount*100).toFixed(1).replace('.',',')}%`:'0,0%'}</span>
 </div>
 </div>
+}
 </article>
 </div>
 </section>
