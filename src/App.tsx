@@ -121,18 +121,20 @@ function CourseChart({rows,summaryData,scope,asOf,period,onPeriodChange}:{rows:C
  const scaleMax=Math.max(1.8,Math.ceil(topDemand/.25)*.25)
  const targetWidth=Math.min(1.5/scaleMax*100,100)
  const periods:[CoursePeriod,string][]=[['all','Todos'],['morning','Manhã'],['afternoon','Tarde'],['night','Noite']]
- const periodSections:[Exclude<CoursePeriod,'all'>,string][]=[['morning','*MANHÃ*'],['afternoon','*TARDE*'],['night','*NOITE*']]
+ // Build the symbols in the browser so WhatsApp receives valid Unicode characters.
+ const whatsappIcons={summary:String.fromCodePoint(0x1f4ca),location:String.fromCodePoint(0x1f4cd),morning:String.fromCodePoint(0x2600,0xfe0f),afternoon:String.fromCodePoint(0x1f324,0xfe0f),night:String.fromCodePoint(0x1f319),target:String.fromCodePoint(0x1f3af)}
+ const periodSections:[Exclude<CoursePeriod,'all'>,string][]=[['morning',`*${whatsappIcons.morning} MANHÃ*`],['afternoon',`*${whatsappIcons.afternoon} TARDE*`],['night',`*${whatsappIcons.night} NOITE*`]]
  const shareSummary=()=>{
-  const generatedAt=formatSnapshotDate(asOf)
+  const generatedAt=formatSnapshotDate(asOf).replace(',', ' às')
   const sections=periodSections.map(([value,label])=>{
    const grouped=[...summaryData.filter(item=>matchesCoursePeriod(item.period,value)).reduce((items,item)=>{const current=items.get(item.course)??{course:item.course,paid:0,unpaid:0,vacancies:0};current.paid+=item.paid;current.unpaid+=item.unpaid;current.vacancies+=item.vacancies;items.set(item.course,current);return items},new Map<string,CourseRow>()).values()].sort((a,b)=>(b.paid+b.unpaid)-(a.paid+a.unpaid)).slice(0,10)
    if(!grouped.length)return ''
-   return `${label}\n${grouped.map(item=>{const total=item.paid+item.unpaid;const demand=item.vacancies?total/item.vacancies:0;return `• ${chartCourseName(item.course)}: ${number.format(total)} | *${number.format(item.paid)}* (${number.format(item.unpaid)}) | ${demand.toFixed(1).replace('.',',')}x`}).join('\n')}`
+   return `${label}\n${grouped.map(item=>{const demand=item.vacancies?(item.paid+item.unpaid)/item.vacancies:0;return `${chartCourseName(item.course)} | *${number.format(item.paid)} pagos* (${number.format(item.unpaid)}) | *${demand.toFixed(1).replace('.',',')}x*`}).join('\n')}`
   }).filter(Boolean)
-  return [`*RESUMO DE INSCRIÇÕES POR CURSO*`,`${generatedAt} | ${scope}`,`( ) = não pagos`,'',...sections,'','Meta: 1,5 candidatos por vaga','_Até 10 cursos por período._'].join('\n')
+  return [`*${whatsappIcons.summary} RESUMO DE INSCRIÇÕES POR CURSO*`,`${whatsappIcons.location} ${scope.replace('Sao','São')} · ${generatedAt}`,`( ) = não pagos`,'',...sections,'',`${whatsappIcons.target} Meta: 1,5 candidatos por vaga`].join('\n')
  }
  const copySummary=async()=>{try{await navigator.clipboard.writeText(shareSummary());setSummaryFeedback('Resumo copiado.')}catch{setSummaryFeedback('Não foi possível copiar o resumo.')}}
- const sendToWhatsApp=()=>window.open(`https://wa.me/?text=${encodeURIComponent(shareSummary())}`,'_blank','noopener,noreferrer')
+ const sendToWhatsApp=()=>window.open(`https://api.whatsapp.com/send/?text=${encodeURIComponent(shareSummary())}&type=custom_url&app_absent=0`,'_blank','noopener,noreferrer')
  return <div className="course-chart">
 <div className="course-plot-shell">
 <div className="course-plot" role="img" aria-label="Demanda por curso, com barras de pagos, não pagos e meta de 1,5 inscritos por vaga">
