@@ -1,14 +1,15 @@
-import { useEffect, useId, useRef, useState, type FormEvent } from 'react'
+import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import D3GeographicMap from './components/D3GeographicMap'
 import { MUN_BY_REGIONAL, REGIONAIS } from './data/aredMapData'
 import type { Enrollment, EtecPoint, SnapshotSeries } from './data/mockData'
 
-type Filters={regional:string[];city:string[];etec:string[];course:string[];period:string[]}; type FilterKey=keyof Filters
+type Filters={regional:string[];city:string[];etec:string[];axis:string[];course:string[];period:string[]}; type FilterKey=keyof Filters
 type OfferStatus='comfortable'|'attention'|'low'
 type RegionalStatus=OfferStatus|'unavailable'
+type PerformanceSortKey='regional'|'total'|'paid'|'conversion'|'demand'|'situation'
 type AnalysisScope={presential:boolean;ead:boolean;trainees:boolean}
 type DashboardPayload={etecs:EtecPoint[];snapshotSeries:SnapshotSeries[]}
-const initialFilters:Filters={regional:[],city:[],etec:[],course:[],period:[]}; const number=new Intl.NumberFormat('pt-BR')
+const initialFilters:Filters={regional:[],city:[],etec:[],axis:[],course:[],period:[]}; const number=new Intl.NumberFormat('pt-BR')
 const exemptionMetrics: { inscritos_com_isencao: number } | null = null
 const apiBaseUrl=(import.meta.env.VITE_API_BASE_URL??'').replace(/\/$/,'')
 const apiUrl=(path:string)=>`${apiBaseUrl}${path}`
@@ -24,7 +25,25 @@ type HistoryPoint={referenceAt:string;total:number;paid:number;unpaid:number;tra
 type CoursePeriod='all'|'morning'|'afternoon'|'night'
 type CourseRow={course:string;paid:number;unpaid:number;vacancies:number}
 const offerStatusFor=(item:Enrollment):OfferStatus=>{const demand=item.vacancies?(item.paid+item.unpaid)/item.vacancies:0;return demand>=1.5?'comfortable':demand>=1?'attention':'low'}
+const situationFor=(regular:number,vacancies:number):RegionalStatus=>!vacancies?'unavailable':regular/vacancies>=1.5?'comfortable':regular/vacancies>=1?'attention':'low'
+const situationLabel=(status:RegionalStatus)=>status==='comfortable'?'Confortável':status==='attention'?'Atenção':status==='low'?'Baixa demanda':'Sem vagas'
 const matchesCoursePeriod=(period:string,scope:CoursePeriod)=>scope==='all'||normalizeName(period).includes(scope==='morning'?'manha':scope==='afternoon'?'tarde':'noite')
+function ActionIcon({name}:{name:'copy'|'whatsapp'|'import'}){
+ if(name==='copy')return <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="7" width="11" height="13" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h2"/></svg>
+ if(name==='whatsapp')return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11.5a8 8 0 0 1-11.8 7L4 20l1.5-4.1A8 8 0 1 1 20 11.5Z"/><path d="M9 8.2c.3-.6.6-.6.9-.6h.4c.2 0 .4.1.5.4l.7 1.6c.1.3.1.5-.1.7l-.5.6c.7 1.3 1.6 2.2 2.9 2.9l.6-.5c.2-.2.4-.2.7-.1l1.6.7c.3.1.4.3.4.5v.4c0 .3 0 .6-.6.9-.4.2-1 .3-1.6.1-2.2-.7-4.6-3.1-5.3-5.3-.2-.6-.1-1.2.1-1.6Z"/></svg>
+ return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V4"/><path d="m8 8 4-4 4 4"/><path d="M5 15v4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-4"/></svg>
+}
+function CourseRowTrack({paid,unpaid,demand,paidWidth,totalWidth,children}:{paid:number;unpaid:number;demand:number;paidWidth:number;totalWidth:number;children:ReactNode}){
+ const trackRef=useRef<HTMLSpanElement>(null); const [width,setWidth]=useState(0)
+ useEffect(()=>{const track=trackRef.current;if(!track)return undefined;const update=()=>setWidth(track.clientWidth);const observer=new ResizeObserver(update);observer.observe(track);update();return()=>observer.disconnect()},[])
+ const paidLabel=number.format(paid); const unpaidLabel=number.format(unpaid); const demandLabel=`${demand.toFixed(1).replace('.',',')}x`; const paidFits=paidWidth/100*width>=Math.max(42,paidLabel.length*7+14); const unpaidFits=(totalWidth-paidWidth)/100*width>=Math.max(42,unpaidLabel.length*7+14); const showInside=paidFits&&unpaidFits
+ return <span className="course-row-track" ref={trackRef}>
+<i className="course-row-paid" style={{width:`${paidWidth}%`}}/>
+<i className="course-row-unpaid" style={{left:`${paidWidth}%`,width:`${Math.max(totalWidth-paidWidth,0)}%`}}/>
+{showInside?<><span className="course-bar-value inside" style={{left:`${paidWidth/2}%`}}>{paidLabel}</span><span className="course-bar-value inside pending" style={{left:`${paidWidth+(totalWidth-paidWidth)/2}%`}}>({unpaidLabel})</span><span className="course-bar-value demand" style={{left:`${totalWidth}%`}}>- {demandLabel}</span></>:<span className="course-bar-value compact" style={{left:`${totalWidth}%`}}><b>{paidLabel}</b><small>({unpaidLabel})</small><em>- {demandLabel}</em></span>}
+{children}
+</span>
+}
 function SelectFilter({label,value,values,onChange,etecOptions=[]}:{label:string;value:string[];values:string[];onChange:(value:string[])=>void;etecOptions?:EtecPoint[]}){
  const [open,setOpen]=useState(false); const [query,setQuery]=useState(''); const filterRef=useRef<HTMLDivElement>(null); const menuId=useId(); const unavailable=values.length===0
  const displayLabel=label==='Etec'?'Local de oferta':label; const rawOptionLabel=(item:string)=>label==='Etec'?(etecOptions.find(etec=>etec.name===item)?.label.replace(/\s*\([^)]*\)\s*$/,'')??item):item; const optionLabel=(item:string)=>label==='Etec'?(etecOptions.find(etec=>etec.name===item)?formatEtecLabel(etecOptions.find(etec=>etec.name===item)!):item):label==='Curso'?compactCourseName(rawOptionLabel(item)):rawOptionLabel(item)
@@ -53,6 +72,7 @@ function TrendChart({data,target}:{data:ChartData;target:number}){
   const plotLeft=74; const plotRight=644
   const points=history.map((point,index)=>{const x=history.length===1?(plotLeft+plotRight)/2:plotLeft+index*(plotRight-plotLeft)/(history.length-1);return {point,x,totalY:plotBottom-point.total/yMax*plotHeight,paidY:plotBottom-point.paid/yMax*plotHeight}})
   const latest=points.at(-1)
+  const latestPaidLabelBelow=Boolean(latest&&(Math.abs(latest.totalY-latest.paidY)<42||latest.paidY-30<plotTop))
   return <div className="trend">
 <div className="chart-legend chart-history-legend">
 <span className="legend-total">Inscritos totais</span><span className="legend-paid">Pagos sem treineiros</span>
@@ -68,9 +88,8 @@ function TrendChart({data,target}:{data:ChartData;target:number}){
 <circle className="chart-paid-dot" cx={x} cy={paidY} r="3"/>
 <text className="chart-date" x={x} y={plotBottom+25} textAnchor="middle">{new Date(point.referenceAt).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})}</text>
 </g>)}
-{latest&&<><text className="chart-latest-value" x={latest.x} y={latest.totalY-13} textAnchor="middle">{number.format(latest.point.total)}</text><text className="chart-latest-paid" x={latest.x} y={latest.paidY+13} textAnchor="middle">{number.format(latest.point.paid)} pagos</text><text className="chart-latest-paid-rate" x={latest.x} y={latest.paidY+25} textAnchor="middle">{latest.point.regular?Math.round(latest.point.paid/latest.point.regular*100):0}%</text></>}
+{latest&&<><text className="chart-latest-value" x={latest.x} y={latest.totalY-13} textAnchor="middle">{number.format(latest.point.total)}</text><text className="chart-latest-paid" x={latest.x} y={latest.paidY+(latestPaidLabelBelow?13:-16)} textAnchor="middle">{number.format(latest.point.paid)} pagos</text><text className="chart-latest-paid-rate" x={latest.x} y={latest.paidY+(latestPaidLabelBelow?25:-5)} textAnchor="middle">{latest.point.regular?Math.round(latest.point.paid/latest.point.regular*100):0}%</text></>}
 </svg>
-<p className="chart-footnote chart-history-footnote"><span>{history.length} snapshot{history.length===1?'':'s'} real{history.length===1?' disponível':' disponíveis'}.</span>{latest&&<span>Último recorte: {number.format(latest.point.vacancies)} vagas · {(latest.point.vacancies?latest.point.regular/latest.point.vacancies:0).toFixed(1)}x de demanda.</span>}</p>
 </div>
  }
  const points=Array.from({length:10},(_,index)=>({day:`Dia ${index+1}`,value:data.reduce((sum,item)=>sum+(item.daily[index]?.value??0),0)})); const max=Math.max(target,...points.map(point=>point.value),1); const pointList=points.map((point,index)=>`${72+index*65},${plotBottom-point.value/max*plotHeight}`).join(' '); const targetY=plotBottom-target/max*plotHeight
@@ -92,15 +111,28 @@ function TrendChart({data,target}:{data:ChartData;target:number}){
 <p className="chart-footnote">Dados acumulados por dia de inscricao</p>
 </div>
 }
-function CourseChart({rows,period,onPeriodChange}:{rows:CourseRow[];period:CoursePeriod;onPeriodChange:(period:CoursePeriod)=>void}){
+function CourseChart({rows,summaryData,scope,asOf,period,onPeriodChange}:{rows:CourseRow[];summaryData:Enrollment[];scope:string;asOf:string;period:CoursePeriod;onPeriodChange:(period:CoursePeriod)=>void}){
  const orderedRows=[...rows].sort((a,b)=>(((b.paid+b.unpaid)/Math.max(b.vacancies,1))-((a.paid+a.unpaid)/Math.max(a.vacancies,1)))||((b.paid+b.unpaid)-(a.paid+a.unpaid))||a.course.localeCompare(b.course,'pt-BR'))
  const [activeCourse,setActiveCourse]=useState<string>('')
+ const [summaryFeedback,setSummaryFeedback]=useState('')
  useEffect(()=>{setActiveCourse(current=>orderedRows.some(row=>row.course===current)?current:'')},[orderedRows])
  const enrichedRows=orderedRows.map(row=>{const total=row.paid+row.unpaid;const paidDemand=row.vacancies?row.paid/row.vacancies:0;const totalDemand=row.vacancies?total/row.vacancies:0;return {...row,total,paidDemand,totalDemand}})
  const topDemand=Math.max(...enrichedRows.map(row=>row.totalDemand),1.5)
  const scaleMax=Math.max(1.8,Math.ceil(topDemand/.25)*.25)
  const targetWidth=Math.min(1.5/scaleMax*100,100)
  const periods:[CoursePeriod,string][]=[['all','Todos'],['morning','Manhã'],['afternoon','Tarde'],['night','Noite']]
+ const periodSections:[Exclude<CoursePeriod,'all'>,string][]=[['morning','*MANHÃ*'],['afternoon','*TARDE*'],['night','*NOITE*']]
+ const shareSummary=()=>{
+  const generatedAt=formatSnapshotDate(asOf)
+  const sections=periodSections.map(([value,label])=>{
+   const grouped=[...summaryData.filter(item=>matchesCoursePeriod(item.period,value)).reduce((items,item)=>{const current=items.get(item.course)??{course:item.course,paid:0,unpaid:0,vacancies:0};current.paid+=item.paid;current.unpaid+=item.unpaid;current.vacancies+=item.vacancies;items.set(item.course,current);return items},new Map<string,CourseRow>()).values()].sort((a,b)=>(b.paid+b.unpaid)-(a.paid+a.unpaid)).slice(0,10)
+   if(!grouped.length)return ''
+   return `${label}\n${grouped.map(item=>{const total=item.paid+item.unpaid;const demand=item.vacancies?total/item.vacancies:0;return `• ${chartCourseName(item.course)}: ${number.format(total)} | *${number.format(item.paid)}* (${number.format(item.unpaid)}) | ${demand.toFixed(1).replace('.',',')}x`}).join('\n')}`
+  }).filter(Boolean)
+  return [`*RESUMO DE INSCRIÇÕES POR CURSO*`,`${generatedAt} | ${scope}`,`( ) = não pagos`,'',...sections,'','Meta: 1,5 candidatos por vaga','_Até 10 cursos por período._'].join('\n')
+ }
+ const copySummary=async()=>{try{await navigator.clipboard.writeText(shareSummary());setSummaryFeedback('Resumo copiado.')}catch{setSummaryFeedback('Não foi possível copiar o resumo.')}}
+ const sendToWhatsApp=()=>window.open(`https://wa.me/?text=${encodeURIComponent(shareSummary())}`,'_blank','noopener,noreferrer')
  return <div className="course-chart">
 <div className="course-plot-shell">
 <div className="course-plot" role="img" aria-label="Demanda por curso, com barras de pagos, não pagos e meta de 1,5 inscritos por vaga">
@@ -108,21 +140,20 @@ function CourseChart({rows,period,onPeriodChange}:{rows:CourseRow[];period:Cours
 <span className="course-chart-paid">Pagos</span>
 <span className="course-chart-unpaid">Pendentes</span>
 </div>
+<div className="course-summary-actions"><button className="icon-action" type="button" onClick={copySummary} aria-label="Copiar resumo" title="Copiar resumo"><ActionIcon name="copy"/></button><button className="icon-action whatsapp-action" type="button" onClick={sendToWhatsApp} aria-label="Enviar resumo no WhatsApp" title="Enviar no WhatsApp"><ActionIcon name="whatsapp"/></button><span className="sr-only" aria-live="polite">{summaryFeedback}</span></div>
 <div className="course-bars-stage">
 <div className="course-bars-list">
 <div className="course-bars-content">
 <span className="course-target-range" aria-hidden="true"><i className="course-target-line" style={{left:`${targetWidth}%`}}/><span className="course-target-label" style={{left:`${targetWidth}%`}}>Meta 1,5x</span></span>
-{enrichedRows.map((row,index)=>{const paidWidth=Math.min(row.paidDemand/scaleMax*100,100);const totalWidth=Math.min(row.totalDemand/scaleMax*100,100);const unpaidWidth=Math.max(totalWidth-paidWidth,0);const active=activeCourse===row.course;const tooltipId=`course-tooltip-${index}`;return <button type="button" className={`course-row${active?' is-active':''}`} key={row.course} aria-describedby={active?tooltipId:undefined} onMouseEnter={()=>setActiveCourse(row.course)} onMouseLeave={()=>setActiveCourse(current=>current===row.course?'':current)} onFocus={()=>setActiveCourse(row.course)} onBlur={()=>setActiveCourse(current=>current===row.course?'':current)} onClick={()=>setActiveCourse(current=>current===row.course?'':row.course)}>
+{enrichedRows.map((row,index)=>{const paidWidth=Math.min(row.paidDemand/scaleMax*100,100);const totalWidth=Math.min(row.totalDemand/scaleMax*100,100);const active=activeCourse===row.course;const tooltipId=`course-tooltip-${index}`;return <button type="button" className={`course-row${active?' is-active':''}`} key={row.course} aria-describedby={active?tooltipId:undefined} onMouseEnter={()=>setActiveCourse(row.course)} onMouseLeave={()=>setActiveCourse(current=>current===row.course?'':current)} onFocus={()=>setActiveCourse(row.course)} onBlur={()=>setActiveCourse(current=>current===row.course?'':current)} onClick={()=>setActiveCourse(current=>current===row.course?'':row.course)}>
 <span className="course-row-label" title={row.course}>{chartCourseName(row.course)}</span>
-<span className="course-row-track">
-<i className="course-row-paid" style={{width:`${paidWidth}%`}}/>
-<i className="course-row-unpaid" style={{left:`${paidWidth}%`,width:`${unpaidWidth}%`}}/>
+<CourseRowTrack paid={row.paid} unpaid={row.unpaid} demand={row.totalDemand} paidWidth={paidWidth} totalWidth={totalWidth}>
 {active&&<span className="course-tooltip" id={tooltipId} role="tooltip" style={{left:`${totalWidth}%`}}>
 <strong>Inscritos: {number.format(row.total)}</strong>
 <span>({number.format(row.paid)} pagos | {number.format(row.unpaid)} pendentes)</span>
-<small>{compactCourseName(row.course)} · {number.format(row.vacancies)} vagas · {row.totalDemand.toFixed(1).replace('.',',')}x</small>
+<small>{number.format(row.vacancies)} vagas · {row.totalDemand.toFixed(1).replace('.',',')}x</small>
 </span>}
-</span>
+</CourseRowTrack>
 </button>})}
 {!enrichedRows.length&&<p className="course-empty">Não há cursos para este período no recorte atual.</p>}
 </div>
@@ -135,10 +166,11 @@ function CourseChart({rows,period,onPeriodChange}:{rows:CourseRow[];period:Cours
 }
 export default function App(){
  const [filters,setFilters]=useState<Filters>(initialFilters); const [analysisScope,setAnalysisScope]=useState<AnalysisScope>({presential:true,ead:false,trainees:false}); const [selectedEtec,setSelectedEtec]=useState(''); const [geographicScope,setGeographicScope]=useState<{label:string;etecs:string[]}|null>(null); const [mapResetKey,setMapResetKey]=useState(0); const [analysisTab,setAnalysisTab]=useState<'evolution'|'courses'|'performance'>('evolution'); const [coursePeriod,setCoursePeriod]=useState<CoursePeriod>('all'); const [statusFilter,setStatusFilter]=useState<OfferStatus|null>(null); const [colorMapByStatus,setColorMapByStatus]=useState(false); const [dashboard,setDashboard]=useState<DashboardPayload|null>(null); const [snapshotEndAt,setSnapshotEndAt]=useState(''); const [importOpen,setImportOpen]=useState(false); const [importPassword,setImportPassword]=useState(''); const [showImportPassword,setShowImportPassword]=useState(false); const [importFile,setImportFile]=useState<File|null>(null); const [importMessage,setImportMessage]=useState(''); const [importing,setImporting]=useState(false)
+ const [performanceSort,setPerformanceSort]=useState<{key:PerformanceSortKey;direction:'asc'|'desc'}>({key:'regional',direction:'asc'})
  useEffect(()=>{let cancelled=false;void fetch(apiUrl('/api/dashboard-data')).then(async response=>response.ok?readJson<{snapshots?:SnapshotSeries[];etecs?:EtecPoint[]}>(response):null).then(payload=>{if(cancelled)return;setDashboard({etecs:payload?.etecs??[],snapshotSeries:payload?.snapshots??[]})}).catch(()=>{if(!cancelled)setDashboard({etecs:[],snapshotSeries:[]})});return()=>{cancelled=true}},[])
  const {etecs,snapshotSeries}=dashboard??{etecs:[],snapshotSeries:[]}; const rangeStartAt=snapshotSeries.at(0)?.referenceAt||''; const rangeEndAt=snapshotEndAt||snapshotSeries.at(-1)?.referenceAt||''; const visibleSnapshotSeries=snapshotSeries.filter(snapshot=>snapshot.referenceAt>=rangeStartAt&&snapshot.referenceAt<=rangeEndAt); const selectedSnapshot=visibleSnapshotSeries.at(-1)??snapshotSeries.at(-1); const enrollments=selectedSnapshot?.enrollments??[]
  const isEadOffer=(item:Enrollment)=>/\bEAD\b/i.test(item.course)||normalizeName(item.period).includes('ead')||normalizeName(item.period)==='on-line'; const matchesAnalysisScope=(item:Enrollment)=>item.isTrainee?analysisScope.trainees:isEadOffer(item)?analysisScope.ead:analysisScope.presential
- const etecByName=new Map(etecs.map(etec=>[etec.name,etec])); const regionalByEtec=new Map(etecs.map(etec=>{const municipality=normalizeName(etec.municipality);return [etec.name,mapRegionalByMunicipality.get(municipality)??mapRegionalFallbackByMunicipality.get(municipality)]})); const regionalFor=(item:Enrollment)=>regionalByEtec.get(item.etec)??item.regional; const cityFor=(item:Enrollment)=>etecByName.get(item.etec)?.municipality??''; const dependentKeys:FilterKey[]=['regional','city','etec','course','period']; const matchesFilters=(item:Enrollment,current:Filters,ignored?:FilterKey)=>dependentKeys.every(candidate=>candidate===ignored||!current[candidate].length||(candidate==='regional'?current.regional.includes(regionalFor(item)):candidate==='city'?current.city.includes(cityFor(item)):current[candidate].includes(item[candidate]))); const valuesFor=(key:FilterKey,current:Filters,scope=geographicScope)=>{const items=enrollments.filter(item=>(!scope||scope.etecs.includes(item.etec))&&matchesFilters(item,current,key)); const validItems=(key==='course'||key==='period')?items.filter(item=>!item.isTrainee):items; return [...new Set(validItems.map(item=>key==='regional'?regionalFor(item):key==='city'?cityFor(item):item[key]))].sort()}; const mapRegionalOptions=REGIONAIS.features.map(feature=>String(feature.properties.regional??'')).filter(regional=>enrollments.some(item=>regionalFor(item)===regional)); const normalizeFilters=(next:Filters,preserve?:FilterKey,scope=geographicScope)=>{let normalized=next; let changed=true; while(changed){changed=false; dependentKeys.forEach(key=>{const values=key==='regional'?mapRegionalOptions:valuesFor(key,normalized,scope);const nextValues=key===preserve?normalized[key]:normalized[key].filter(value=>values.includes(value));if(nextValues.length!==normalized[key].length){normalized={...normalized,[key]:nextValues};changed=true}})} return normalized}; const options={regional:mapRegionalOptions,city:valuesFor('city',filters),etec:valuesFor('etec',filters),course:valuesFor('course',filters),period:valuesFor('period',filters)}
+ const etecByName=new Map(etecs.map(etec=>[etec.name,etec])); const regionalByEtec=new Map(etecs.map(etec=>{const municipality=normalizeName(etec.municipality);return [etec.name,mapRegionalByMunicipality.get(municipality)??mapRegionalFallbackByMunicipality.get(municipality)]})); const regionalFor=(item:Enrollment)=>regionalByEtec.get(item.etec)??item.regional; const cityFor=(item:Enrollment)=>etecByName.get(item.etec)?.municipality??''; const dependentKeys:FilterKey[]=['regional','city','etec','axis','course','period']; const matchesFilters=(item:Enrollment,current:Filters,ignored?:FilterKey)=>dependentKeys.every(candidate=>candidate===ignored||!current[candidate].length||(candidate==='regional'?current.regional.includes(regionalFor(item)):candidate==='city'?current.city.includes(cityFor(item)):candidate==='axis'?current.axis.includes(item.axis??''):current[candidate].includes(item[candidate]))); const valuesFor=(key:FilterKey,current:Filters,scope=geographicScope)=>{const items=enrollments.filter(item=>(!scope||scope.etecs.includes(item.etec))&&matchesFilters(item,current,key)); const validItems=(key==='axis'||key==='course'||key==='period')?items.filter(item=>!item.isTrainee):items; return [...new Set(validItems.map(item=>key==='regional'?regionalFor(item):key==='city'?cityFor(item):key==='axis'?item.axis??'':item[key]).filter(Boolean))].sort()}; const mapRegionalOptions=REGIONAIS.features.map(feature=>String(feature.properties.regional??'')).filter(regional=>enrollments.some(item=>regionalFor(item)===regional)); const normalizeFilters=(next:Filters,preserve?:FilterKey,scope=geographicScope)=>{let normalized=next; let changed=true; while(changed){changed=false; dependentKeys.forEach(key=>{const values=key==='regional'?mapRegionalOptions:valuesFor(key,normalized,scope);const nextValues=key===preserve?normalized[key]:normalized[key].filter(value=>values.includes(value));if(nextValues.length!==normalized[key].length){normalized={...normalized,[key]:nextValues};changed=true}})} return normalized}; const options={regional:mapRegionalOptions,city:valuesFor('city',filters),etec:valuesFor('etec',filters),axis:valuesFor('axis',filters),course:valuesFor('course',filters),period:valuesFor('period',filters)}
  const updateFilter=(key:FilterKey,value:string[])=>{setGeographicScope(null);setFilters(current=>normalizeFilters({...current,[key]:value},key,null));if(key!=='regional'&&key!=='city')setMapResetKey(current=>current+1);setSelectedEtec(key==='etec'&&value.length===1?value[0]:'')}; const selectEtec=(etec:string)=>{const scope={label:etec,etecs:[etec]};const city=etecByName.get(etec)?.municipality??'';setSelectedEtec(etec);setGeographicScope(scope);setFilters(current=>normalizeFilters({...current,city:city?[city]:[],etec:[etec]},'etec',scope))}; const selectGeographicScope=(label:string,scopedEtecs:string[])=>{const scope={label,etecs:scopedEtecs};const scopedCities=[...new Set(scopedEtecs.map(etec=>etecByName.get(etec)?.municipality).filter((city):city is string=>Boolean(city)))];const city=scopedCities.length===1?scopedCities[0]:'';setSelectedEtec('');setGeographicScope(scope);setFilters(current=>normalizeFilters({...current,city:city?[city]:[],etec:[]},city?'city':undefined,scope))}; const selectRegionalCities=(regional:string)=>{setSelectedEtec('');setGeographicScope(null);setFilters(current=>{const base={...current,regional:[],city:[],etec:[]};const availableCities=new Set(valuesFor('city',base,null));const cities=(MUN_BY_REGIONAL[regional]?.features??[]).map(feature=>String(feature.properties.name??'')).filter(city=>availableCities.has(city));return normalizeFilters({...base,city:cities},'city',null)})}; const clearGeographicScope=()=>{setSelectedEtec('');setGeographicScope(null);setFilters(current=>normalizeFilters({...current,city:[],etec:[]},undefined,null))}; const clearFilters=()=>{setSelectedEtec('');setGeographicScope(null);setStatusFilter(null);setFilters(initialFilters);setMapResetKey(current=>current+1)}
  const uploadImport=async(event:FormEvent<HTMLFormElement>)=>{event.preventDefault();if(!importFile||!importPassword){setImportMessage('Informe a senha e selecione a planilha para continuar.');return}setImporting(true);setImportMessage('Validando e importando a planilha...');try{const response=await fetch(apiUrl('/api/import-inscricoes'),{method:'POST',headers:{'X-Import-Password':importPassword,'Content-Type':importFile.type||'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet','X-File-Name':encodeURIComponent(importFile.name)},body:importFile});const payload=await readJson<{error?:string;records?:number}>(response);if(!response.ok)throw new Error(payload.error??'Não foi possível importar a planilha.');setImportPassword('');setImportMessage(`Importação publicada com ${number.format(payload.records??0)} ofertas. Atualizando o painel...`);window.setTimeout(()=>window.location.reload(),900)}catch(error){setImportMessage(error instanceof Error?error.message:'Não foi possível importar a planilha.')}finally{setImporting(false)}}
  const matchesBaseScope=(item:Enrollment)=>matchesFilters(item,filters)&&(!geographicScope||geographicScope.etecs.includes(item.etec))
@@ -162,16 +194,21 @@ export default function App(){
  const enrollmentScope=activeModes.join(' + ')||'Nenhum tipo selecionado'
  const demandRatio=demandTotals.vacancies?demandTotals.paid/demandTotals.vacancies:null
  const kpis=[['Inscritos totais',number.format(total),`${number.format(totals.trainee)} Treineiros incluidos`,'blue'],['Inscritos pagos',number.format(totals.paid),`${total?Math.round(totals.paid/total*100):0}% do total`,'green'],['Inscritos isentos',exemptionMetrics?number.format(exemptionMetrics.inscritos_com_isencao):'N/D','fonte de isenção indisponível','purple'],['Conversao',`${total?Math.round(totals.paid/total*100):0}%`,'Pagos / totais','amber'],['Vagas oferecidas',number.format(totals.vacancies),'somente ofertas regulares','cyan'],['Demanda efetiva',demandRatio===null?'N/A':`${demandRatio.toFixed(1)}x`,'somente inscritos regulares','orange']]
- const describeSelected=(label:string,values:string[],format=(value:string)=>value)=>values.length?`${label}: ${values.length===1?format(values[0]):`${values.length} selecionados`}`:''; const geographicSummary=selectedEtec?`Local de oferta: ${selectedEtecDisplayLabel}`:geographicScope?`${geographicScopeIsMunicipality?'Município':'Regional'}: ${geographicScope.label}`:''; const scopeSummary=[geographicSummary,describeSelected('Regional',filters.regional),describeSelected('Cidade',filters.city),!selectedEtec?describeSelected('Local de oferta',filters.etec,value=>{const etec=etecByName.get(value);return etec?formatEtecLabel(etec):value}):'',describeSelected('Curso',filters.course,compactCourseName),describeSelected('Período',filters.period)].filter(Boolean).join(' • ')||scope.replace('Sao','São')
+ const describeSelected=(label:string,values:string[],format=(value:string)=>value)=>values.length?`${label}: ${values.length===1?format(values[0]):`${values.length} selecionados`}`:''; const geographicSummary=selectedEtec?`Local de oferta: ${selectedEtecDisplayLabel}`:geographicScope?`${geographicScopeIsMunicipality?'Município':'Regional'}: ${geographicScope.label}`:''; const scopeSummary=[geographicSummary,describeSelected('Regional',filters.regional),describeSelected('Cidade',filters.city),!selectedEtec?describeSelected('Local de oferta',filters.etec,value=>{const etec=etecByName.get(value);return etec?formatEtecLabel(etec):value}):'',describeSelected('Eixo tecnológico',filters.axis),describeSelected('Curso',filters.course,compactCourseName),describeSelected('Período',filters.period)].filter(Boolean).join(' • ')||scope.replace('Sao','São')
  void kpis
  const visible=activeEtecs.map(etec=>etec.name); const performanceGroups=new Map<string,Enrollment[]>(); data.forEach(item=>{const group=performanceDimension==='course'?item.course:performanceDimension==='municipality'?cityFor(item):regionalFor(item);const items=performanceGroups.get(group)??[];items.push(item);performanceGroups.set(group,items)}); const performanceRows=[...performanceGroups.entries()].map(([group,items])=>{const regularItems=items.filter(item=>!item.isTrainee);const value=items.reduce((sum,item)=>sum+item.paid+item.unpaid,0);const regularValue=regularItems.reduce((sum,item)=>sum+item.paid+item.unpaid,0);const paid=regularItems.reduce((sum,item)=>sum+item.paid,0);const vacancies=regularItems.reduce((sum,item)=>sum+item.vacancies,0);const offersWithVacancies=regularItems.filter(item=>item.vacancies>0);const lowDemand=offersWithVacancies.filter(item=>(item.paid+item.unpaid)/item.vacancies<1).length;return {group,value,regularValue,paid,vacancies,lowDemand,regularOfferCount:offersWithVacancies.length}}).filter(row=>row.value>0).sort((a,b)=>a.group.localeCompare(b.group,'pt-BR')); const drillIntoPerformanceRow=(group:string)=>{if(performanceDimension==='course')return;const scopedEtecs=etecs.filter(etec=>performanceDimension==='regional'?regionalByEtec.get(etec.name)===group:etec.municipality===group).map(etec=>etec.name);if(scopedEtecs.length)selectGeographicScope(group,scopedEtecs)}; const goBackPerformanceLevel=()=>{if(performanceDimension==='course'&&geographicScopeIsMunicipality&&focusedMapRegional){const regionalEtecs=etecs.filter(etec=>regionalByEtec.get(etec.name)===focusedMapRegional).map(etec=>etec.name);selectGeographicScope(focusedMapRegional,regionalEtecs);return}clearGeographicScope()}; const performanceBackLabel=performanceDimension==='course'&&geographicScopeIsMunicipality?'Voltar para municípios':'Voltar para regionais'; const mapFilters=geographicScope?{...filters,city:[],etec:[]}:filters; const mapOffers=enrollments.filter(item=>!item.isTrainee&&!isEadOffer(item)&&matchesFilters(item,mapFilters)&&item.vacancies>0); const lowDemandRate=(items:Enrollment[])=>items.length?items.filter(item=>item.paid/item.vacancies<1).length/items.length:undefined; const mapRegionalLowDemandRates:Record<string,number>=Object.fromEntries(options.regional.flatMap(regional=>{const rate=lowDemandRate(mapOffers.filter(item=>regionalFor(item)===regional));return rate===undefined?[]:[[regional,rate]]})); const mapMunicipalityLowDemandRates:Record<string,number>=Object.fromEntries([...new Set(etecs.map(etec=>etec.municipality))].flatMap(municipality=>{const rate=lowDemandRate(mapOffers.filter(item=>normalizeName(cityFor(item))===normalizeName(municipality)));return rate===undefined?[]:[[normalizeName(municipality),rate]]})); const mapRegionalStatuses:Record<string,RegionalStatus>=Object.fromEntries(options.regional.map(regional=>{const offers=mapOffers.filter(item=>regionalFor(item)===regional);const paid=offers.reduce((sum,item)=>sum+item.paid,0);const vacancies=offers.reduce((sum,item)=>sum+item.vacancies,0);const ratio=vacancies?paid/vacancies:0;return [regional,vacancies?(ratio>=1.5?'comfortable':ratio>=1?'attention':'low'):'unavailable']})); const locationStatusCounts=(items:Enrollment[])=>{const totalsByLocation=new Map<string,{paid:number;vacancies:number}>();items.forEach(item=>{const current=totalsByLocation.get(item.etec)??{paid:0,vacancies:0};current.paid+=item.paid;current.vacancies+=item.vacancies;totalsByLocation.set(item.etec,current)});return [...totalsByLocation.values()].reduce((counts,{paid,vacancies})=>{const ratio=vacancies?paid/vacancies:0;counts.total++;if(ratio>=1.5)counts.comfortable++;else if(ratio>=1)counts.attention++;else counts.low++;return counts},{total:0,comfortable:0,attention:0,low:0})}; const turmaStatusCounts=(items:Enrollment[])=>items.reduce((counts,item)=>{const ratio=item.vacancies?item.paid/item.vacancies:0;counts.total++;if(ratio>=1.5)counts.comfortable++;else if(ratio>=1)counts.attention++;else counts.low++;return counts},{total:0,comfortable:0,attention:0,low:0}); const regionalLocationStatusCounts=Object.fromEntries(options.regional.map(regional=>[regional,locationStatusCounts(mapOffers.filter(item=>regionalFor(item)===regional))])); const municipalityLocationStatusCounts=Object.fromEntries([...new Set(etecs.map(etec=>etec.municipality))].map(municipality=>{const items=mapOffers.filter(item=>normalizeName(cityFor(item))===normalizeName(municipality));const locations=locationStatusCounts(items);return [normalizeName(municipality),locations.total===1?{...turmaStatusCounts(items),label:'Turmas' as const}:{...locations,label:'Locais de oferta' as const}]})); const mapStatusKey=[...Object.entries(mapRegionalLowDemandRates),...Object.entries(mapMunicipalityLowDemandRates),...Object.entries(regionalLocationStatusCounts),...Object.entries(municipalityLocationStatusCounts)].map(([label,value])=>`${label}:${typeof value==='number'?value:JSON.stringify(value)}`).join('|'); const offerStatus=[['Demanda confortável',demandBands.comfortable,'demand-comfortable'],['Atenção',demandBands.attention,'demand-attention'],['Baixa demanda',demandBands.low,'demand-low']] as const
+ const performanceHeaders:[PerformanceSortKey,string][]=[['regional',performanceColumn],['total','Inscritos'],['paid','Pagos'],['conversion','Conversão'],['demand','Demanda'],['situation','Situação']]
+ const sortedPerformanceRows=[...performanceRows].sort((left,right)=>{const valueFor=(row:typeof performanceRows[number])=>performanceSort.key==='regional'?row.group:performanceSort.key==='total'?row.value:performanceSort.key==='paid'?row.paid:performanceSort.key==='conversion'?(row.value?row.paid/row.value:0):performanceSort.key==='demand'?(row.vacancies?row.regularValue/row.vacancies:0):({comfortable:3,attention:2,low:1,unavailable:0}[situationFor(row.regularValue,row.vacancies)]);const first=valueFor(left);const second=valueFor(right);const comparison=typeof first==='string'?first.localeCompare(second as string,'pt-BR'):(first as number)-(second as number);return performanceSort.direction==='asc'?comparison:-comparison})
+ const togglePerformanceSort=(key:PerformanceSortKey)=>setPerformanceSort(current=>current.key===key?{key,direction:current.direction==='asc'?'desc':'asc'}:{key,direction:key==='regional'||key==='situation'?'asc':'desc'})
  return <div className="app-shell">
 <header className="institutional-header">
 <div className="brand">
-<div>
+<div className="brand-primary">
 <h1>VESTIBULINHO 2027.1</h1>
 <p>Acompanhamento das Inscrições</p>
 </div>
+<span className="brand-deadline-divider" aria-hidden="true"/>
+<div className="brand-deadlines"><span>INSCRIÇÕES ATÉ 3/11</span><span>PROVA 6/12</span></div>
 </div>
 <div className="header-meta">
 <div className="analysis-scope" role="group" aria-label="Recorte">
@@ -184,7 +221,7 @@ export default function App(){
 {snapshotSeries.map(snapshot=><option key={snapshot.referenceAt} value={snapshot.referenceAt}>{formatSnapshotDate(snapshot.referenceAt)}</option>)}
 </select>
 </label>:<p className="empty-data-notice">Nenhuma planilha publicada nesta edição.</p>}
-<button type="button" onClick={()=>{setImportMessage('');setImportOpen(true)}}>Importar planilha</button>
+<button className="import-trigger icon-action" type="button" onClick={()=>{setImportMessage('');setImportOpen(true)}} aria-label="Importar planilha" title="Importar planilha"><ActionIcon name="import"/></button>
 </div>
 </header>
 <main className="content">
@@ -193,7 +230,7 @@ export default function App(){
 <SelectFilter label="Regional" value={filters.regional} values={options.regional} onChange={value=>updateFilter('regional',value)}/>
 <SelectFilter label="Cidade" value={filters.city} values={options.city} onChange={value=>updateFilter('city',value)}/>
 <SelectFilter label="Etec" value={filters.etec} values={options.etec} onChange={value=>updateFilter('etec',value)} etecOptions={etecs}/>
-<SelectFilter label="Eixo tecnológico" value={[]} values={[]} onChange={()=>{}}/>
+<SelectFilter label="Eixo tecnológico" value={filters.axis} values={options.axis} onChange={value=>updateFilter('axis',value)}/>
 <SelectFilter label="Curso" value={filters.course} values={options.course} onChange={value=>updateFilter('course',value)}/>
 <SelectFilter label="Periodo" value={filters.period} values={options.period} onChange={value=>updateFilter('period',value)}/>
 <button className="clear-button" type="button" onClick={clearFilters}>Limpar filtros</button>
@@ -239,7 +276,7 @@ export default function App(){
 </div>
 <div className="status-list">{offerStatus.map(([label,value,tone],index)=>{const percentage=regularOfferCount?value/regularOfferCount*100:0;const roundedPercentage=Math.round(percentage);const progressLabelFits=percentage>=7;return <button type="button" key={label} className={`${tone}${statusFilter===(['comfortable','attention','low'] as OfferStatus[])[index]?' active':''}`} onClick={()=>{const next=(['comfortable','attention','low'] as OfferStatus[])[index];setStatusFilter(current=>current===next?null:next)}}>
 <div className="status-value"><strong data-label={label}>{number.format(value)}</strong></div>
-<div className="status-progress" role="progressbar" aria-label={`${label}: ${roundedPercentage}% das ofertas`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={roundedPercentage}><i style={{width:`${percentage}%`}}/><span className={`status-progress-label${progressLabelFits?'':' status-progress-label-outside'}`} style={{left:`${progressLabelFits?percentage/2:0}%`}}>{roundedPercentage}%</span></div>
+<div className="status-progress" role="progressbar" aria-label={`${label}: ${roundedPercentage}% das ofertas`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={roundedPercentage}>{percentage>0&&<i style={{width:`${percentage}%`,opacity:.12+percentage/100*.88}}/>}<span className={`status-progress-label${progressLabelFits?'':' status-progress-label-outside'}${percentage<55?' status-progress-label-tone':''}`} style={{left:`${progressLabelFits?percentage/2:0}%`}}>{roundedPercentage}%</span></div>
 </button>})}</div>
 </article>
 </section>
@@ -262,29 +299,24 @@ export default function App(){
 <button type="button" role="tab" aria-selected={analysisTab==='courses'} className={analysisTab==='courses'?'active':''} onClick={()=>setAnalysisTab('courses')}>Cursos</button>
 <button type="button" role="tab" aria-selected={analysisTab==='performance'} className={analysisTab==='performance'?'active':''} onClick={()=>setAnalysisTab('performance')}>{performanceTabLabel}</button>
 </div>
-{analysisTab==='evolution'?<TrendChart data={data} target={totals.target}/>:analysisTab==='courses'?<CourseChart rows={courseRows} period={coursePeriod} onPeriodChange={setCoursePeriod}/>:<div className="regional-table analysis-regional-table">
+{analysisTab==='evolution'?<TrendChart data={data} target={totals.target}/>:analysisTab==='courses'?<CourseChart rows={courseRows} summaryData={data.filter(item=>!item.isTrainee)} scope={scope} asOf={rangeEndAt} period={coursePeriod} onPeriodChange={setCoursePeriod}/>:<div className="regional-table analysis-regional-table">
 <div className="regional-head">
-<span>{performanceColumn}</span>
-<span>Inscritos</span>
-<span>Pagos</span>
-<span>Conversao</span>
-<span>Demanda</span>
-<span>Baixa demanda</span>
-</div>{performanceRows.map(row=>
+{performanceHeaders.map(([key,label])=>{const active=performanceSort.key===key;return <button type="button" className={`regional-sort${active?' active':''}`} key={key} onClick={()=>togglePerformanceSort(key)} aria-label={`Ordenar por ${label}${active?`, ordem ${performanceSort.direction==='asc'?'crescente':'decrescente'}`:''}`}><span>{label}</span>{active&&<i className="regional-sort-arrow" aria-hidden="true">{performanceSort.direction==='asc'?'▲':'▼'}</i>}</button>})}
+</div>{sortedPerformanceRows.map(row=>
 <button type="button" className={`regional-line${performanceDimension==='course'?'':' is-drilldown'}`} key={row.group} onClick={()=>drillIntoPerformanceRow(row.group)} disabled={performanceDimension==='course'} aria-label={performanceDimension==='course'?row.group:`Abrir ${row.group}`}>
 <strong>{row.group}</strong>
 <span>{number.format(row.value)}</span>
 <span>{number.format(row.paid)}</span>
 <span>{row.value?`${Math.round(row.paid/row.value*100)}%`:'0%'}</span>
 <span>{row.vacancies?`${(row.regularValue/row.vacancies).toFixed(1)}x`:'N/A'}</span>
-<span>{number.format(row.lowDemand)} · {row.regularOfferCount?`${(row.lowDemand/row.regularOfferCount*100).toFixed(1).replace('.',',')}%`:'0,0%'}</span>
+<span className={`performance-situation status-${situationFor(row.regularValue,row.vacancies)}`}>{situationLabel(situationFor(row.regularValue,row.vacancies))}</span>
 </button>)}<div className="regional-total">
 <strong>Total geral</strong>
 <span>{number.format(total)}</span>
 <span>{number.format(totals.paid)}</span>
 <span>{total?`${Math.round(totals.paid/total*100)}%`:'0%'}</span>
 <span>{totals.vacancies?`${(totals.regular/totals.vacancies).toFixed(1)}x`:'N/A'}</span>
-<span>{number.format(demandBands.low)} · {regularOfferCount?`${(demandBands.low/regularOfferCount*100).toFixed(1).replace('.',',')}%`:'0,0%'}</span>
+<span className={`performance-situation status-${situationFor(totals.regular,totals.vacancies)}`}>{situationLabel(situationFor(totals.regular,totals.vacancies))}</span>
 </div>
 </div>
 }

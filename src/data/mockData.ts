@@ -1,7 +1,7 @@
 import snapshot from './snapshots/2026.2/2026-06-05T20-22-00-03-00.json'
 
 export type DailyPoint = { day: string; value: number }
-export type Enrollment = { etec: string; regional: string; modality: string; course: string; period: string; paid: number; unpaid: number; vacancies: number; demand: number; target: number; daily: DailyPoint[]; isTrainee: boolean }
+export type Enrollment = { etec: string; regional: string; modality: string; course: string; axis?: string; period: string; paid: number; unpaid: number; vacancies: number; demand: number; target: number; daily: DailyPoint[]; isTrainee: boolean }
 export type EtecPoint = { name: string; label: string; city: string; municipality: string; regional: string; x: number; y: number }
 export type ExemptionMetrics = { solicitacoes: number; aprovadas: number; inscritos_com_isencao: number }
 type Snapshot = typeof snapshot

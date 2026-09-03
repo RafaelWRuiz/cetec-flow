@@ -4,7 +4,14 @@ import { asWebRequest, sendWebResponse } from './http.mjs'
 
 type ImportRecord = { id: string; edition: string; source_file_name: string; reference_at: string }
 type SnapshotRow = { local_code: string; municipality: string | null; etec_name: string | null; regional: string | null; course: string; period: string; vacancies: number; paid: number; unpaid: number; is_trainee: boolean }
+type CourseAxisRow = { course_key: string; technological_axis: string }
 const EDITION = 'Vestibulinho 2027.1'
+
+const normalizeCourseKey = (value: string) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim()
+  .replace(/^ensino medio com habilitacao profissional de tecnico em\s+/, '')
+  .replace(/^tecnico em\s+/, '')
+  .replace(/\s+-\s+(?:m[- ]?tec|mnp|ead|20% online|integrado ao ensino medio|novotec)\b.*$/, '')
+  .replace(/[^a-z0-9]+/g, ' ').trim()
 
 const json = (body: Record<string, unknown>, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'cache-control': 'no-store', 'content-type': 'application/json; charset=utf-8' } })
 
@@ -16,6 +23,12 @@ async function loadRows(supabase: SupabaseClient, importId: string) {
     rows.push(...(data ?? []))
     if (!data || data.length < 1000) return rows
   }
+}
+
+async function loadCourseAxes(supabase: SupabaseClient) {
+  const { data, error } = await supabase.from('cetec_course_axes').select('course_key, technological_axis').returns<CourseAxisRow[]>()
+  if (error) return new Map<string, string>()
+  return new Map((data ?? []).map((item) => [item.course_key, item.technological_axis]))
 }
 
 async function handle(request: Request) {
@@ -33,10 +46,13 @@ async function handle(request: Request) {
   if (importsError) return json({ error: 'Não foi possível carregar o histórico.' }, 500)
 
   try {
-    const loaded = await Promise.all((imports ?? []).map(async (item) => ({ item, rows: await loadRows(supabase, item.id) })))
+    const [loaded, courseAxes] = await Promise.all([
+      Promise.all((imports ?? []).map(async (item) => ({ item, rows: await loadRows(supabase, item.id) }))),
+      loadCourseAxes(supabase),
+    ])
     const current = loaded.at(-1)!
     const etecs = [...new Map(current.rows.map((row) => [row.local_code, { name: row.local_code, label: `${row.etec_name ?? row.local_code} (${row.local_code})`, city: row.municipality ?? '', municipality: row.municipality ?? '', regional: row.regional ?? '', x: 0, y: 0 }])).values()]
-    const snapshots = loaded.map(({ item, rows }) => ({ referenceAt: item.reference_at, enrollments: rows.map((row) => ({ etec: row.local_code, regional: row.regional ?? '', modality: 'Não informado no arquivo', course: row.course, period: row.period, paid: row.paid, unpaid: row.unpaid, vacancies: row.vacancies, demand: row.vacancies ? (row.paid + row.unpaid) / row.vacancies : 0, target: 0, daily: [], isTrainee: row.is_trainee })) }))
+    const snapshots = loaded.map(({ item, rows }) => ({ referenceAt: item.reference_at, enrollments: rows.map((row) => ({ etec: row.local_code, regional: row.regional ?? '', modality: 'Não informado no arquivo', course: row.course, axis: courseAxes.get(normalizeCourseKey(row.course)) ?? '', period: row.period, paid: row.paid, unpaid: row.unpaid, vacancies: row.vacancies, demand: row.vacancies ? (row.paid + row.unpaid) / row.vacancies : 0, target: 0, daily: [], isTrainee: row.is_trainee })) }))
     return json({ sourceMetadata: { edicao: active.edition, arquivo_origem: active.source_file_name, data_referencia: active.reference_at }, etecs, snapshots })
   } catch {
     return json({ error: 'Não foi possível carregar os dados da versão ativa.' }, 500)
