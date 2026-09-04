@@ -18,7 +18,8 @@ const json = (body: Record<string, unknown>, status = 200) => new Response(JSON.
 async function loadRows(supabase: SupabaseClient, importId: string) {
   const rows: SnapshotRow[] = []
   for (let from = 0; ; from += 1000) {
-    const { data, error } = await supabase.from('cetec_enrollment_snapshots').select('local_code, municipality, etec_name, regional, course, period, vacancies, paid, unpaid, is_trainee').eq('import_id', importId).range(from, from + 999)
+    // A unique, stable order prevents overlaps and omissions between pages.
+    const { data, error } = await supabase.from('cetec_enrollment_snapshots').select('local_code, municipality, etec_name, regional, course, period, vacancies, paid, unpaid, is_trainee').eq('import_id', importId).order('id', { ascending: true }).range(from, from + 999)
     if (error) throw error
     rows.push(...(data ?? []))
     if (!data || data.length < 1000) return rows
