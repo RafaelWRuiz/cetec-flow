@@ -31,6 +31,11 @@ const json = (body: Record<string, unknown>, status = 200) => new Response(JSON.
 
 const chunk = <T,>(items: T[], size: number) => Array.from({ length: Math.ceil(items.length / size) }, (_, index) => items.slice(index * size, index * size + size))
 
+const errorMessage = (error: unknown) => {
+  if (error && typeof error === 'object' && 'message' in error && typeof error.message === 'string') return error.message
+  return 'Falha ao gravar as ofertas.'
+}
+
 const passwordMatches = (expected: string, supplied: string) => {
   const expectedBuffer = Buffer.from(expected)
   const suppliedBuffer = Buffer.from(supplied)
@@ -72,42 +77,64 @@ async function handle(request: Request) {
   if (!snapshot.locais.length || !snapshot.ofertas.length) return json({ error: 'A planilha não possui locais ou ofertas válidas.' }, 422)
 
   const checksum = createHash('sha256').update(file).digest('hex')
-  const { data: duplicate, error: duplicateError } = await supabase.from('cetec_imports').select('id, reference_at').eq('source_checksum', checksum).maybeSingle()
+  const { data: duplicate, error: duplicateError } = await supabase.from('cetec_imports').select('id, reference_at, status').eq('source_checksum', checksum).maybeSingle()
   if (duplicateError) return json({ error: 'Não foi possível verificar importações anteriores.' }, 500)
-  if (duplicate) return json({ error: `Esta mesma planilha já foi importada em ${new Date(duplicate.reference_at).toLocaleString('pt-BR')}.` }, 409)
-
-  const editionPath = snapshot.metadata.edicao.toLowerCase().replace(/[^a-z0-9]+/g, '-')
-  const extension = /\.xlsx$/i.test(fileName) ? 'xlsx' : 'xls'
-  const sourcePath = `${editionPath}/${new Date().toISOString()}-${checksum.slice(0, 12)}.${extension}`
-  const { error: uploadError } = await supabase.storage.from(BUCKET).upload(sourcePath, file, {
-    contentType: extension === 'xlsx'
-      ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-      : 'application/vnd.ms-excel',
-    upsert: false,
-  })
-  if (uploadError) return json({ error: 'Não foi possível salvar o arquivo original.' }, 500)
+  if (duplicate?.status === 'completed') return json({ error: `Esta mesma planilha já foi importada em ${new Date(duplicate.reference_at).toLocaleString('pt-BR')}.` }, 409)
+  if (duplicate?.status === 'processing') return json({ error: 'Esta mesma planilha já está sendo processada.' }, 409)
 
   const total = snapshot.metadata.total_geral
-  const { data: importRecord, error: importError } = await supabase.from('cetec_imports').insert({
-    edition: snapshot.metadata.edicao,
-    source_file_name: fileName,
-    source_checksum: checksum,
-    source_path: sourcePath,
-    reference_at: snapshot.metadata.data_referencia,
-    status: 'processing',
-    records_count: snapshot.ofertas.length,
-    total_paid: total.pagos,
-    total_unpaid: total.nao_pagos,
-    total_vacancies: total.vagas,
-  }).select('id').single()
-  if (importError || !importRecord) return json({ error: 'Não foi possível registrar a importação.' }, 500)
+  let importId = duplicate?.id
+  if (duplicate?.status === 'failed') {
+    // A checksum is unique: reuse the failed record instead of rejecting the same source file.
+    const { error: deleteError } = await supabase.from('cetec_enrollment_snapshots').delete().eq('import_id', duplicate.id)
+    if (deleteError) return json({ error: 'Não foi possível preparar a nova tentativa da importação.' }, 500)
+    const { error: retryError } = await supabase.from('cetec_imports').update({
+      edition: snapshot.metadata.edicao,
+      source_file_name: fileName,
+      reference_at: snapshot.metadata.data_referencia,
+      status: 'processing',
+      records_count: snapshot.ofertas.length,
+      total_paid: total.pagos,
+      total_unpaid: total.nao_pagos,
+      total_vacancies: total.vagas,
+      is_active: false,
+      error_message: null,
+    }).eq('id', duplicate.id)
+    if (retryError) return json({ error: 'Não foi possível preparar a nova tentativa da importação.' }, 500)
+  } else {
+    const editionPath = snapshot.metadata.edicao.toLowerCase().replace(/[^a-z0-9]+/g, '-')
+    const extension = /\.xlsx$/i.test(fileName) ? 'xlsx' : 'xls'
+    const sourcePath = `${editionPath}/${new Date().toISOString()}-${checksum.slice(0, 12)}.${extension}`
+    const { error: uploadError } = await supabase.storage.from(BUCKET).upload(sourcePath, file, {
+      contentType: extension === 'xlsx'
+        ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        : 'application/vnd.ms-excel',
+      upsert: false,
+    })
+    if (uploadError) return json({ error: 'Não foi possível salvar o arquivo original.' }, 500)
+
+    const { data: importRecord, error: importError } = await supabase.from('cetec_imports').insert({
+      edition: snapshot.metadata.edicao,
+      source_file_name: fileName,
+      source_checksum: checksum,
+      source_path: sourcePath,
+      reference_at: snapshot.metadata.data_referencia,
+      status: 'processing',
+      records_count: snapshot.ofertas.length,
+      total_paid: total.pagos,
+      total_unpaid: total.nao_pagos,
+      total_vacancies: total.vagas,
+    }).select('id').single()
+    if (importError || !importRecord) return json({ error: 'Não foi possível registrar a importação.' }, 500)
+    importId = importRecord.id
+  }
 
   const localByCode = new Map(snapshot.locais.map((local) => [local.codigo_completo, local]))
   const rows: ImportRow[] = snapshot.ofertas.map((offer) => {
     const local = localByCode.get(offer.codigo_local)
     if (!local) throw new Error(`Local não encontrado para ${offer.codigo_local}.`)
     return {
-      import_id: importRecord.id,
+      import_id: importId!,
       local_code: offer.codigo_local,
       etec_code: local.codigo_etec,
       local_type: local.tipo_local,
@@ -130,11 +157,12 @@ async function handle(request: Request) {
       if (error) throw error
     }
     await supabase.from('cetec_imports').update({ is_active: false }).eq('edition', snapshot.metadata.edicao).eq('is_active', true)
-    const { error: activateError } = await supabase.from('cetec_imports').update({ is_active: true, status: 'completed' }).eq('id', importRecord.id)
+    const { error: activateError } = await supabase.from('cetec_imports').update({ is_active: true, status: 'completed' }).eq('id', importId!)
     if (activateError) throw activateError
   } catch (error) {
-    await supabase.from('cetec_imports').update({ status: 'failed', error_message: error instanceof Error ? error.message : 'Falha ao gravar as ofertas.' }).eq('id', importRecord.id)
-    return json({ error: 'A importação não foi publicada. Os dados anteriores foram preservados.' }, 500)
+    const detail = errorMessage(error)
+    await supabase.from('cetec_imports').update({ status: 'failed', error_message: detail }).eq('id', importId!)
+    return json({ error: `A importação não foi publicada. Os dados anteriores foram preservados. Detalhe: ${detail}` }, 500)
   }
 
   return json({
