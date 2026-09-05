@@ -491,7 +491,7 @@ footer {
 .enrollment-progress-unpaid { background: var(--cps-yellow); }
 .enrollment-progress-trainee { background: var(--cps-cyan); }
 .enrollment-metrics { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-self: end; min-width: 0; padding-top: 0; }
-.enrollment-metrics.has-trainees { grid-template-columns: max-content max-content minmax(0, 1fr); }
+.enrollment-trainee-detail { grid-column: 1 / -1; margin-top: 5px; color: var(--cps-text-secondary); font-size: 10px; line-height: 1.2; }
 .enrollment-metric { display: block; min-width: 0; padding: 0 7px; font-size: 10px; font-weight: 700; letter-spacing: -.2px; line-height: 1.15; text-align: center; white-space: nowrap; }
 .enrollment-metric:first-child { padding-left: 0; text-align: left; }
 .enrollment-metric + .enrollment-metric { border-left: 1px solid var(--cps-border); }
