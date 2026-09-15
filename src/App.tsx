@@ -168,8 +168,9 @@ function CourseChart({rows,summaryData,scope,asOf,period,onPeriodChange}:{rows:C
 </div>
 }
 export default function App(){
- const [filters,setFilters]=useState<Filters>(initialFilters); const [analysisScope,setAnalysisScope]=useState<AnalysisScope>({presential:true,ead:false,trainees:false}); const [selectedEtec,setSelectedEtec]=useState(''); const [geographicScope,setGeographicScope]=useState<{label:string;etecs:string[]}|null>(null); const [mapResetKey,setMapResetKey]=useState(0); const [analysisTab,setAnalysisTab]=useState<'evolution'|'courses'|'performance'>('evolution'); const [coursePeriod,setCoursePeriod]=useState<CoursePeriod>('all'); const [statusFilter,setStatusFilter]=useState<OfferStatus|null>(null); const [colorMapByStatus,setColorMapByStatus]=useState(false); const [dashboard,setDashboard]=useState<DashboardPayload|null>(null); const [snapshotEndAt,setSnapshotEndAt]=useState(''); const [importOpen,setImportOpen]=useState(false); const [importPassword,setImportPassword]=useState(''); const [showImportPassword,setShowImportPassword]=useState(false); const [importFile,setImportFile]=useState<File|null>(null); const [importMessage,setImportMessage]=useState(''); const [importing,setImporting]=useState(false)
+ const [filters,setFilters]=useState<Filters>(initialFilters); const [analysisScope,setAnalysisScope]=useState<AnalysisScope>({presential:true,ead:false,trainees:false}); const [selectedEtec,setSelectedEtec]=useState(''); const [geographicScope,setGeographicScope]=useState<{label:string;etecs:string[]}|null>(null); const [mapResetKey,setMapResetKey]=useState(0); const [analysisTab,setAnalysisTab]=useState<'evolution'|'courses'|'performance'>('evolution'); const [coursePeriod,setCoursePeriod]=useState<CoursePeriod>('all'); const [statusFilter,setStatusFilter]=useState<OfferStatus|null>(null); const [colorMapByStatus,setColorMapByStatus]=useState(false); const [dashboard,setDashboard]=useState<DashboardPayload|null>(null); const [snapshotEndAt,setSnapshotEndAt]=useState(''); const [importOpen,setImportOpen]=useState(false); const [importPassword,setImportPassword]=useState(''); const [showImportPassword,setShowImportPassword]=useState(false); const [importFile,setImportFile]=useState<File|null>(null); const [importMessage,setImportMessage]=useState(''); const [importing,setImporting]=useState(false); const [mobileMenuOpen,setMobileMenuOpen]=useState(false)
  const [performanceSort,setPerformanceSort]=useState<{key:PerformanceSortKey;direction:'asc'|'desc'}>({key:'regional',direction:'asc'})
+ useEffect(()=>{if(!mobileMenuOpen)return undefined;const close=(event:PointerEvent)=>{if(!(event.target instanceof Element)||!event.target.closest('.header-tools'))setMobileMenuOpen(false)};const escape=(event:KeyboardEvent)=>{if(event.key==='Escape')setMobileMenuOpen(false)};document.addEventListener('pointerdown',close);document.addEventListener('keydown',escape);return()=>{document.removeEventListener('pointerdown',close);document.removeEventListener('keydown',escape)}},[mobileMenuOpen])
  useEffect(()=>{let cancelled=false;void fetch(apiUrl('/api/dashboard-data')).then(async response=>response.ok?readJson<{snapshots?:SnapshotSeries[];etecs?:EtecPoint[]}>(response):null).then(payload=>{if(cancelled)return;setDashboard({etecs:payload?.etecs??[],snapshotSeries:payload?.snapshots??[]})}).catch(()=>{if(!cancelled)setDashboard({etecs:[],snapshotSeries:[]})});return()=>{cancelled=true}},[])
  const {etecs,snapshotSeries}=dashboard??{etecs:[],snapshotSeries:[]}; const rangeStartAt=snapshotSeries.at(0)?.referenceAt||''; const rangeEndAt=snapshotEndAt||snapshotSeries.at(-1)?.referenceAt||''; const visibleSnapshotSeries=snapshotSeries.filter(snapshot=>snapshot.referenceAt>=rangeStartAt&&snapshot.referenceAt<=rangeEndAt); const selectedSnapshot=visibleSnapshotSeries.at(-1)??snapshotSeries.at(-1); const enrollments=selectedSnapshot?.enrollments??[]
  const isEadOffer=(item:Enrollment)=>/\bEAD\b/i.test(item.course)||normalizeName(item.period).includes('ead')||normalizeName(item.period)==='on-line'; const matchesAnalysisScope=(item:Enrollment)=>item.isTrainee?analysisScope.trainees:isEadOffer(item)?analysisScope.ead:analysisScope.presential
@@ -212,7 +213,9 @@ export default function App(){
 <span className="brand-deadline-divider" aria-hidden="true"/>
 <div className="brand-deadlines"><span>INSCRIÇÕES ATÉ 3/11</span><span>PROVA 6/12</span></div>
 </div>
-<div className="header-meta">
+<div className="header-tools">
+<button className="mobile-menu-toggle" type="button" aria-label={mobileMenuOpen?'Fechar menu':'Abrir menu'} aria-expanded={mobileMenuOpen} aria-controls="header-menu" onClick={()=>setMobileMenuOpen(current=>!current)}><i aria-hidden="true"/><i aria-hidden="true"/><i aria-hidden="true"/></button>
+<div className={`header-meta${mobileMenuOpen?' is-open':''}`} id="header-menu">
 <div className="analysis-scope" role="group" aria-label="Recorte">
 <span className="analysis-scope-title">Recorte</span>
 <div className="analysis-scope-options">{([['presential','Presencial'],['ead','EAD'],['trainees','Treineiros']] as const).map(([key,label])=><label key={key}><input type="checkbox" checked={analysisScope[key]} onChange={event=>setAnalysisScope(current=>({...current,[key]:event.target.checked}))}/><span>{label}</span></label>)}</div>
@@ -223,7 +226,8 @@ export default function App(){
 {snapshotSeries.map(snapshot=><option key={snapshot.referenceAt} value={snapshot.referenceAt}>{formatSnapshotDate(snapshot.referenceAt)}</option>)}
 </select>
 </label>:<p className="empty-data-notice">Nenhuma planilha publicada nesta edição.</p>}
-<button className="import-trigger icon-action" type="button" onClick={()=>{setImportMessage('');setImportOpen(true)}} aria-label="Importar planilha" title="Importar planilha"><ActionIcon name="import"/></button>
+<button className="import-trigger icon-action" type="button" onClick={()=>{setMobileMenuOpen(false);setImportMessage('');setImportOpen(true)}} aria-label="Importar planilha" title="Importar planilha"><ActionIcon name="import"/></button>
+</div>
 </div>
 </header>
 <main className="content">
