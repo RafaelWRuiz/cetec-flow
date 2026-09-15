@@ -662,3 +662,25 @@ footer::before { display: none !important; content: none !important; }
 
 .d3-unit-marker.is-sao-paulo-unit:hover .d3-unit-dot, .d3-unit-marker.is-sao-paulo-unit:focus .d3-unit-dot { r: 4px; }
 .d3-unit-marker.is-sao-paulo-unit.is-selected .d3-unit-dot { r: 4.6px; }
+
+/* Phones narrower than the desktop-first header need a deliberate reflow. */
+@media (max-width: 380px) {
+  .institutional-header { min-height: 0; padding: 16px 17px 14px; }
+  .brand { display: grid; width: 100%; gap: 8px; }
+  .brand-primary { min-width: 0; }
+  .brand h1 { font-size: 20px; line-height: 1.08; white-space: nowrap; }
+  .brand p { max-width: 220px; font-size: 13px; line-height: 1.15; }
+  .brand-deadline-divider { display: none; }
+  .brand-deadlines { grid-template-columns: auto auto; justify-content: start; gap: 12px; font-size: 13px; line-height: 1.1; }
+  .content { width: calc(100% - 20px); }
+  .panel-header { padding-inline: 14px; }
+  .map-panel-header { align-items: flex-start; }
+  .map-panel-header h2 { max-width: 58%; line-height: 1.25; }
+  .map-status-toggle { margin-left: 0; }
+  .kpi-status-heading { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); align-items: start; gap: 6px; }
+  .kpi-status-heading p { min-width: 0; }
+  .kpi-status-heading small { min-width: 0; white-space: normal; line-height: 1.15; text-align: right; }
+  .analysis-tabs { gap: 0; padding-inline: 10px; }
+  .analysis-tabs button { flex: 1 1 0; min-width: 0; padding-inline: 4px; font-size: 10px; line-height: 1.2; }
+  footer, .dashboard-footer { min-height: 42px; height: auto; max-height: none; padding: 8px 12px; font-size: 9px; line-height: 1.25; white-space: normal; }
+}
