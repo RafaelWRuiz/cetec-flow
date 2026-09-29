@@ -1,0 +1,26 @@
+.enrollment-reports { display: flex; flex: 1; flex-direction: column; min-width: 0; min-height: 0; padding: 12px; gap: 10px; color: var(--cps-text); }
+.reports-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.reports-heading h3 { margin: 0; font-size: 14px; color: var(--cps-blue-dark); }
+.reports-heading button, .reports-switch button { border: 1px solid var(--cps-border); border-radius: 4px; padding: 8px 10px; background: var(--cps-surface); color: var(--cps-blue-dark); font: inherit; font-size: 12px; cursor: pointer; }
+.reports-switch { display: flex; flex-wrap: wrap; gap: 6px; }
+.reports-switch button[aria-pressed="true"] { background: var(--cps-blue); border-color: var(--cps-blue); color: var(--cps-surface); }
+.reports-heading button:hover, .reports-switch button:not([aria-pressed="true"]):hover { background: var(--cps-hover); }
+.enrollment-reports :focus-visible, .reports-dialog :focus-visible { outline: 2px solid var(--cps-blue); outline-offset: 2px; }
+.reports-scope, .reports-note { margin: 0; color: var(--cps-text-secondary); font-size: 12px; line-height: 1.5; }
+.reports-scope { font-weight: 600; }
+.reports-dates { display: flex; flex-wrap: wrap; gap: 12px; }
+.reports-dates label { display: grid; flex: 1; gap: 5px; min-width: 160px; font-size: 12px; }
+.reports-dates select { width: 100%; min-height: 36px; border: 1px solid var(--cps-border); border-radius: 4px; padding: 6px; color: var(--cps-text); background: var(--cps-surface); font: inherit; }
+.reports-table-scroll { overflow: auto; min-height: 100px; flex: 1; max-height: 440px; border: 1px solid var(--cps-border); border-radius: 4px; }
+.reports-table-scroll table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 12px; font-variant-numeric: tabular-nums; }
+.reports-table-scroll th, .reports-table-scroll td { padding: 12px; border-bottom: 1px solid var(--cps-border); text-align: right; white-space: nowrap; }
+.reports-table-scroll th:first-child { text-align: left; }
+.reports-table-scroll tbody th { min-width: 170px; max-width: 300px; white-space: normal; font-weight: 500; }
+.reports-table-scroll thead th { position: sticky; top: 0; background: var(--cps-hover); color: var(--cps-blue-dark); font-size: 11px; z-index: 1; }
+.reports-table-scroll tbody tr:hover { background: var(--cps-hover); }
+.reports-table-scroll tfoot { font-weight: 700; background: var(--cps-hover); }
+.reports-dialog[open] { display: flex; flex-direction: column; gap: 14px; position: fixed; inset: 0; width: 100%; height: 100dvh; max-width: none; max-height: none; margin: 0; box-sizing: border-box; border: 0; padding: 24px; background: var(--cps-surface); color: var(--cps-text); }
+.reports-dialog .reports-table-scroll { max-height: none; }
+.reports-dialog::backdrop { background: var(--cps-surface); }
+.analysis-tabs { flex-wrap: wrap; }
+@media (max-width: 620px) { .reports-dialog[open] { padding: 16px; } .reports-heading button, .reports-switch button { min-height: 40px; } }
