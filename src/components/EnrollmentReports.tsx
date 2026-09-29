@@ -49,16 +49,18 @@ export default function EnrollmentReports({ snapshots, scope, groupLabel, groupF
         <button ref={expandButton} type="button" onClick={() => setExpanded(true)} aria-haspopup="dialog">Expandir ↗</button>}
     </div>
     <p className="reports-scope">{scope}</p>
-    <div className="reports-switch" role="group" aria-label="Tipo de relatório">
-      <button type="button" aria-pressed={mode === 'daily'} onClick={() => setMode('daily')}>Controle diário</button>
-      <button type="button" aria-pressed={mode === 'compare'} onClick={() => setMode('compare')}>Comparar datas</button>
+    <div className="reports-controls">
+      <div className="reports-switch" role="group" aria-label="Tipo de relatório">
+        <button type="button" aria-pressed={mode === 'daily'} onClick={() => setMode('daily')}>Controle diário</button>
+        <button type="button" aria-pressed={mode === 'compare'} onClick={() => setMode('compare')}>Comparar datas</button>
+      </div>
+      <div className="reports-switch reports-calculation-switch" role="group" aria-label="Forma de apresentação">
+        <button type="button" aria-pressed={dailyMode === 'accumulated'} onClick={() => setDailyMode('accumulated')}>Acumulado por data</button>
+        <button type="button" aria-pressed={dailyMode === 'variation'} onClick={() => setDailyMode('variation')}>Variação entre datas</button>
+      </div>
     </div>
     {!ordered.length ? <p className="reports-note">Nenhuma importação disponível. Importe uma planilha para iniciar o histórico.</p> : <>
       {mode === 'daily' ? <>
-        <div className="reports-switch" role="group" aria-label="Apuração do controle diário">
-          <button type="button" aria-pressed={dailyMode === 'accumulated'} onClick={() => setDailyMode('accumulated')}>Acumulado por data</button>
-          <button type="button" aria-pressed={dailyMode === 'variation'} onClick={() => setDailyMode('variation')}>Variação entre datas</button>
-        </div>
         <p className="reports-note">Última importação de cada dia, no horário de Brasília. {dailyMode === 'variation' ? 'Diferença desde a data disponível anterior: pode incluir pagamentos, cancelamentos e correções. Não representa necessariamente novas inscrições do dia.' : 'Demanda efetiva = pagos regulares ÷ vagas regulares.'}</p>
         <div className="reports-table-scroll" tabIndex={0} role="region" aria-label="Tabela de controle diário">
           <table>
@@ -77,14 +79,20 @@ export default function EnrollmentReports({ snapshots, scope, groupLabel, groupF
           <label>Data inicial<select value={start?.referenceAt ?? ''} onChange={event => setStartAt(event.target.value)}>{ordered.filter(item => Date.parse(item.referenceAt) <= Date.parse(end?.referenceAt ?? '')).map(item => <option key={item.referenceAt} value={item.referenceAt}>{date(item.referenceAt)}</option>)}</select></label>
           <label>Data final<select value={end?.referenceAt ?? ''} onChange={event => setEndAt(event.target.value)}>{ordered.map(item => <option key={item.referenceAt} value={item.referenceAt}>{date(item.referenceAt)}</option>)}</select></label>
         </div>
-        <p className="reports-note">Por {groupLabel.toLowerCase()}. Efetivação = pagos ÷ total na data final. Base inicial zero: variação percentual N/A. Entradas e saídas de ofertas também afetam a comparação.</p>
+        <p className="reports-note">Por {groupLabel.toLowerCase()}. {dailyMode === 'variation' ? 'A variação pode incluir pagamentos, cancelamentos, correções e entradas ou saídas de ofertas.' : 'Acumulados mostram a posição em cada data selecionada.'} Base inicial zero: variação percentual N/A.</p>
         {ordered.length < 2 && <p className="reports-note">Há apenas uma importação. Importe outra data para comparar a evolução.</p>}
         <div className="reports-table-scroll" tabIndex={0} role="region" aria-label="Tabela de comparação entre datas">
           <table>
             <caption className="sr-only">Comparação de {start && date(start.referenceAt)} até {end && date(end.referenceAt)}</caption>
-            <thead><tr>{[groupLabel, 'Inscritos iniciais', 'Inscritos finais', 'Diferença absoluta', 'Variação (%)', 'Efetivação final (%)'].map(label => <th scope="col" key={label}>{label}</th>)}</tr></thead>
-            <tbody>{comparisons.map(row => <tr key={row.group}><th scope="row">{row.group}</th><td>{number.format(row.start.total)}</td><td>{number.format(row.end.total)}</td><td>{signed.format(row.difference)}</td><td>{row.percent === null ? 'N/A' : `${row.percent > 0 ? '+' : ''}${decimal.format(row.percent)}%`}</td><td>{row.conversion === null ? 'N/A' : `${decimal.format(row.conversion)}%`}</td></tr>)}</tbody>
-            <tfoot><tr><th scope="row">Total do recorte</th><td>{number.format(initialTotals.total)}</td><td>{number.format(finalTotals.total)}</td><td>{signed.format(totalDifference)}</td><td>{initialTotals.total ? `${totalDifference > 0 ? '+' : ''}${decimal.format(totalDifference / initialTotals.total * 100)}%` : 'N/A'}</td><td>{finalTotals.total ? `${decimal.format(finalTotals.paid / finalTotals.total * 100)}%` : 'N/A'}</td></tr></tfoot>
+            {dailyMode === 'accumulated' ? <>
+              <thead><tr>{[groupLabel, 'Inscritos iniciais', 'Inscritos finais', 'Diferença absoluta', 'Variação (%)', 'Efetivação final (%)'].map(label => <th scope="col" key={label}>{label}</th>)}</tr></thead>
+              <tbody>{comparisons.map(row => <tr key={row.group}><th scope="row">{row.group}</th><td>{number.format(row.start.total)}</td><td>{number.format(row.end.total)}</td><td>{signed.format(row.difference)}</td><td>{row.percent === null ? 'N/A' : `${row.percent > 0 ? '+' : ''}${decimal.format(row.percent)}%`}</td><td>{row.conversion === null ? 'N/A' : `${decimal.format(row.conversion)}%`}</td></tr>)}</tbody>
+              <tfoot><tr><th scope="row">Total do recorte</th><td>{number.format(initialTotals.total)}</td><td>{number.format(finalTotals.total)}</td><td>{signed.format(totalDifference)}</td><td>{initialTotals.total ? `${totalDifference > 0 ? '+' : ''}${decimal.format(totalDifference / initialTotals.total * 100)}%` : 'N/A'}</td><td>{finalTotals.total ? `${decimal.format(finalTotals.paid / finalTotals.total * 100)}%` : 'N/A'}</td></tr></tfoot>
+            </> : <>
+              <thead><tr>{[groupLabel, 'Δ Pagos', 'Δ Não pagos', 'Δ Inscrições', 'Variação (%)'].map(label => <th scope="col" key={label}>{label}</th>)}</tr></thead>
+              <tbody>{comparisons.map(row => <tr key={row.group}><th scope="row">{row.group}</th><td>{signed.format(row.end.paid - row.start.paid)}</td><td>{signed.format(row.end.unpaid - row.start.unpaid)}</td><td>{signed.format(row.difference)}</td><td>{row.percent === null ? 'N/A' : `${row.percent > 0 ? '+' : ''}${decimal.format(row.percent)}%`}</td></tr>)}</tbody>
+              <tfoot><tr><th scope="row">Total do recorte</th><td>{signed.format(finalTotals.paid - initialTotals.paid)}</td><td>{signed.format(finalTotals.unpaid - initialTotals.unpaid)}</td><td>{signed.format(totalDifference)}</td><td>{initialTotals.total ? `${totalDifference > 0 ? '+' : ''}${decimal.format(totalDifference / initialTotals.total * 100)}%` : 'N/A'}</td></tr></tfoot>
+            </>}
           </table>
           {!comparisons.length && <p className="reports-note">Nenhuma oferta encontrada no recorte selecionado.</p>}
         </div>

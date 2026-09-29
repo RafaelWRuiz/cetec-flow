@@ -63,7 +63,7 @@ function SelectFilter({label,value,values,onChange,etecOptions=[]}:{label:string
 </div>
 }
 function TrendChart({data,target}:{data:ChartData;target:number}){
- const svgRef=useRef<SVGSVGElement>(null); const [viewHeight,setViewHeight]=useState(265)
+ const svgRef=useRef<SVGSVGElement>(null); const [viewHeight,setViewHeight]=useState(265); const [historyFrequency,setHistoryFrequency]=useState<'auto'|'all'|'weekly'>('auto')
  useEffect(()=>{const svg=svgRef.current;if(!svg)return undefined;const update=()=>{if(!svg.clientWidth)return;const next=Math.max(265,Math.round(svg.clientHeight/svg.clientWidth*680));setViewHeight(current=>current===next?current:next)};const observer=new ResizeObserver(update);observer.observe(svg);update();return()=>observer.disconnect()},[])
  const plotTop=38; const plotBottom=viewHeight-52; const plotHeight=plotBottom-plotTop
  if(!data.some(item=>item.daily.length)){
@@ -71,14 +71,20 @@ function TrendChart({data,target}:{data:ChartData;target:number}){
   const maxCount=Math.max(...history.map(point=>Math.max(point.total,point.paid)),1)
   const magnitude=10**Math.floor(Math.log10(maxCount)); const normalized=maxCount/magnitude; const yMax=(normalized<=1?1:normalized<=2?2:normalized<=5?5:10)*magnitude; const tickStep=yMax<=5?1:yMax/5; const yTicks=Array.from({length:Math.round(yMax/tickStep)+1},(_,index)=>index*tickStep); const axisLabel=(value:number)=>value>=1000?`${number.format(value/1000)} mil`:number.format(value)
   const plotLeft=74; const plotRight=644
+  const baseline=history[0]
   const points=history.map((point,index)=>{const x=history.length===1?(plotLeft+plotRight)/2:plotLeft+index*(plotRight-plotLeft)/(history.length-1);return {point,x,totalY:plotBottom-point.total/yMax*plotHeight,paidY:plotBottom-point.paid/yMax*plotHeight}})
-  const dateStep=Math.max(1,Math.ceil((points.length-1)/5));
-  const visibleDateIndexes=new Set(points.flatMap((_,index)=>index===0||index===points.length-1||index%dateStep===0?[index]:[]));
+  const changeLabel=(current:number,initial:number)=>initial===0?'sem base para comparar':new Intl.NumberFormat('pt-BR',{style:'percent',signDisplay:'exceptZero',maximumFractionDigits:1}).format((current-initial)/initial)
+  const visiblePointIndexes=historyFrequency==='all'?new Set(points.map((_,index)=>index)):historyFrequency==='weekly'?(()=>{const weeklyIndexes=new Set<number>();let previousWeek='';points.forEach(({point},index)=>{const date=new Date(point.referenceAt);const day=(date.getDay()+6)%7;date.setDate(date.getDate()-day);const week=`${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;if(week!==previousWeek){weeklyIndexes.add(index);previousWeek=week}else{weeklyIndexes.delete(index-1);weeklyIndexes.add(index)}});if(points.length)weeklyIndexes.add(points.length-1);return weeklyIndexes})():(()=>{const count=Math.min(points.length,8);return new Set(Array.from({length:count},(_,index)=>count===1?0:Math.round(index*(points.length-1)/(count-1))))})()
   const latest=points.at(-1)
   const latestPaidLabelBelow=Boolean(latest&&(Math.abs(latest.totalY-latest.paidY)<42||latest.paidY-30<plotTop))
   return <div className="trend">
 <div className="chart-legend chart-history-legend">
+<div className="chart-history-toolbar">
+<div className="chart-history-series">
 <span className="legend-total">Inscritos totais</span><span className="legend-paid">Inscritos pagos</span>
+</div>
+<label className="chart-history-frequency">Pontos <select aria-label="Frequência dos pontos do gráfico" value={historyFrequency} onChange={event=>setHistoryFrequency(event.target.value as 'auto'|'all'|'weekly')}><option value="auto">Automático</option><option value="all">Todas as importações</option><option value="weekly">Semanal</option></select></label>
+</div>
 </div>
 <svg ref={svgRef} viewBox={`0 0 680 ${viewHeight}`} role="img" aria-label="Evolução histórica de inscritos totais e pagos">
 <g className="chart-grid">{yTicks.map(value=>{const y=plotBottom-value/yMax*plotHeight;return <g key={value}><line x1={plotLeft} x2={plotRight} y1={y} y2={y}/><text className="chart-axis-label" x={plotLeft-10} y={y+3} textAnchor="end">{axisLabel(value)}</text></g>})}</g>
@@ -87,9 +93,10 @@ function TrendChart({data,target}:{data:ChartData;target:number}){
 <polyline className="chart-line chart-total-line" points={points.map(({x,totalY})=>`${x},${totalY}`).join(' ')}/>
 <polyline className="chart-line chart-paid-line" points={points.map(({x,paidY})=>`${x},${paidY}`).join(' ')}/>
 {points.map(({point,x,totalY,paidY},pointIndex)=><g key={point.referenceAt}>
-<circle className="chart-dot chart-total-dot" cx={x} cy={totalY} r="5"><title>{`${new Date(point.referenceAt).toLocaleString('pt-BR')}: ${number.format(point.total)} inscritos, ${number.format(point.paid)} pagos (${point.total?Math.round(point.paid/point.total*100):0}%), ${number.format(point.vacancies)} vagas e ${(point.vacancies?point.paid/point.vacancies:0).toFixed(2)}x de demanda efetiva`}</title></circle>
+{visiblePointIndexes.has(pointIndex)&&<><title>{`${new Date(point.referenceAt).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})} · Inscrições ${changeLabel(point.total,baseline.total)} · Pagos ${changeLabel(point.paid,baseline.paid)} (desde o início)`}</title>
+<circle className="chart-dot chart-total-dot" cx={x} cy={totalY} r="5"/>
 <circle className="chart-paid-dot" cx={x} cy={paidY} r="3"/>
-{visibleDateIndexes.has(pointIndex)&&<text className="chart-date" x={x} y={plotBottom+25} textAnchor="middle">{new Date(point.referenceAt).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})}</text>}
+<text className="chart-date" x={x} y={plotBottom+25} textAnchor="middle">{new Date(point.referenceAt).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})}</text></>}
 </g>)}
 {latest&&<><text className="chart-latest-value" x={latest.x} y={latest.totalY-13} textAnchor="middle">{number.format(latest.point.total)}</text><text className="chart-latest-paid" x={latest.x} y={latest.paidY+(latestPaidLabelBelow?13:-16)} textAnchor="middle">{number.format(latest.point.paid)} pagos</text><text className="chart-latest-paid-rate" x={latest.x} y={latest.paidY+(latestPaidLabelBelow?25:-5)} textAnchor="middle">{latest.point.total?Math.round(latest.point.paid/latest.point.total*100):0}%</text></>}
 </svg>

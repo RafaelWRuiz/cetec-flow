@@ -2,7 +2,9 @@
 .reports-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .reports-heading h3 { margin: 0; font-size: 14px; color: var(--cps-blue-dark); }
 .reports-heading button, .reports-switch button { border: 1px solid var(--cps-border); border-radius: 4px; padding: 8px 10px; background: var(--cps-surface); color: var(--cps-blue-dark); font: inherit; font-size: 12px; cursor: pointer; }
+.reports-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 18px; }
 .reports-switch { display: flex; flex-wrap: wrap; gap: 6px; }
+.reports-calculation-switch { border-left: 1px solid var(--cps-border); padding-left: 18px; }
 .reports-switch button[aria-pressed="true"] { background: var(--cps-blue); border-color: var(--cps-blue); color: var(--cps-surface); }
 .reports-heading button:hover, .reports-switch button:not([aria-pressed="true"]):hover { background: var(--cps-hover); }
 .enrollment-reports :focus-visible, .reports-dialog :focus-visible { outline: 2px solid var(--cps-blue); outline-offset: 2px; }
@@ -23,4 +25,4 @@
 .reports-dialog .reports-table-scroll { max-height: none; }
 .reports-dialog::backdrop { background: var(--cps-surface); }
 .analysis-tabs { flex-wrap: wrap; }
-@media (max-width: 620px) { .reports-dialog[open] { padding: 16px; } .reports-heading button, .reports-switch button { min-height: 40px; } }
+@media (max-width: 620px) { .reports-dialog[open] { padding: 16px; } .reports-heading button, .reports-switch button { min-height: 40px; } .reports-controls { gap: 10px; } .reports-calculation-switch { border-left: 0; padding-left: 0; } }

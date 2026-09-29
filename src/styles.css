@@ -160,6 +160,13 @@ body, .app-shell { background: var(--cps-bg); color: var(--cps-text); }
 .chart-line { fill: none; stroke: var(--cps-cyan); }
 .chart-dot { fill: var(--cps-surface); stroke: var(--cps-cyan); }
 .chart-history-legend { gap: 16px; }
+.chart-history-toolbar { display: grid; width: 100%; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 8px; }
+.chart-history-series { display: flex; grid-column: 2; align-items: center; gap: 16px; white-space: nowrap; }
+.chart-history-frequency { display: inline-flex; grid-column: 3; align-items: center; justify-self: end; gap: 6px; color: var(--cps-text-secondary); font-size: 10px; white-space: nowrap; }
+.chart-history-frequency select { min-height: 28px; border: 1px solid var(--cps-border); border-radius: 5px; padding: 0 8px; color: var(--cps-text); background: var(--cps-surface); font-size: 10px; }
+.chart-history-frequency select:focus-visible { outline: 2px solid var(--cps-cyan); outline-offset: 2px; }
+.evolution-panel .trend { display: grid; flex: 1; grid-template-rows: auto minmax(0, 1fr); min-height: 0; }
+.evolution-panel .trend svg { height: 100%; min-height: 0; }
 .chart-history-legend .legend-total::before { border-top-color: var(--cps-cyan); }
 .chart-history-legend .legend-paid::before { border-top-color: var(--cps-blue); }
 .chart-total-line { stroke: var(--cps-cyan); stroke-width: 3; }
