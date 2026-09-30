@@ -105,6 +105,13 @@ for (const item of imports) {
       throw new Error(`Metadados antigos inesperados na oferta ${index} da importação ${item.id}.`)
     }
     if (!sites.has(local.codigo_completo)) sites.set(local.codigo_completo, { index: sites.size, local })
+    else {
+      const known = sites.get(local.codigo_completo).local
+      if (['codigo_etec', 'municipio', 'nome', 'regiao_administrativa', 'regiao_governo']
+        .some((field) => known[field] !== local[field])) {
+        throw new Error(`Metadados variáveis para ${local.codigo_completo}; é necessário separar por importação.`)
+      }
+    }
     const siteIndex = sites.get(local.codigo_completo).index
     corrections.push({ id: row.id, oldCode, siteIndex })
     backup.push({ id: row.id, import_id: item.id, previous: {

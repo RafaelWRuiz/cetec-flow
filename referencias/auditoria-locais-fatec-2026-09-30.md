@@ -10,7 +10,7 @@ A planilha tem **39 locais Fatec**, com **61 ofertas regulares**, **2377 vagas**
 
 ## Atribuições a corrigir no snapshot ativo
 
-| Local correto na planilha | Município | Ofertas regulares | Pagos | Local que recebeu as ofertas |
+| Local correto na planilha | Município | Ofertas regulares | Pagos | Local que recebia as ofertas |
 |---|---|---:|---:|---|
 | `E0063.F0291` Etec Eng. Herval Bellusci - Fatec Adamantina | Adamantina | 1 | 6 | `E0063.S0000` Etec Eng. Herval Bellusci |
 | `E0055.F0291` Etec Prof. Eudécio Luiz Vicente - Fatec Adamantina | Adamantina | 2 | 23 | `E0055.S0000` Etec Prof. Eudécio Luiz Vicente |
@@ -58,4 +58,11 @@ A planilha tem **39 locais Fatec**, com **61 ofertas regulares**, **2377 vagas**
 - `E0165.E0001`: EE Manoel Bento da Cruz, com Recursos Humanos e Redes de Computadores.
 - `E0165.F0177`: Fatec Araçatuba, com Administração e Desenvolvimento de Sistemas M-Tec AMS (79 pagos, 15 não pagos e 80 vagas no total).
 
-A API publicada mostra apenas os dois primeiros locais porque o terceiro foi omitido na importação. O parser local já foi corrigido; os dados publicados e o histórico ainda exigem reprocessamento.
+Antes da correção, a API publicada mostrava apenas os dois primeiros locais porque o terceiro era omitido na importação.
+
+## Correção aplicada em 30/09/2026
+
+- Parser corrigido e publicado na `main` no commit `7b376c5`; deployment de produção confirmado.
+- Os 39 snapshots foram comparados com suas planilhas originais (115.075 ofertas conferidas). Uma transação corrigiu a atribuição de 3.821 linhas, com validação antes e depois da atualização.
+- Verificação posterior: 39 locais Fatec em cada snapshot, 3.821 linhas Fatec no histórico e nenhuma divergência nos totais de pagos, não pagos ou vagas.
+- A API pública passou a mostrar `E0165.S0000`, `E0165.E0001` e `E0165.F0177` em Araçatuba. Os dois cursos AMS estão em `E0165.F0177`.
