@@ -10,7 +10,7 @@ const number = (value) => Number(String(value).replaceAll('.', '').replace(',', 
 const cells = (html) => [...html.matchAll(/<t[dh]\b[^>]*>([\s\S]*?)<\/t[dh]>/gi)].map((match) => decode(match[1]))
 
 const parseLocationTitle = (title) => {
-  const head = title.match(/^E(\d{4})\.([SME])(\d{4})\s+-\s+(.+?)\s+-\s+(.+?)\s+\(Região Administrativa(?: de)?\s+(.+?)\s+-\s+Região de Governo(?: de)?\s+(.+?)\)$/i) ?? title.match(/^E(\d{4})\.([SME])(\d{4})\s+-\s+(.+?)\s+-\s+(.+?)\s+\(Região Metropolitana de São Paulo\s+-\s+-\)$/i)
+  const head = title.match(/^E(\d{4})\.([SMEF])(\d{4})\s+-\s+(.+?)\s+-\s+(.+?)\s+\(Região Administrativa(?: de)?\s+(.+?)\s+-\s+Região de Governo(?: de)?\s+(.+?)\)$/i) ?? title.match(/^E(\d{4})\.([SMEF])(\d{4})\s+-\s+(.+?)\s+-\s+(.+?)\s+\(Região Metropolitana de São Paulo\s+-\s+-\)$/i)
   if (!head) throw new Error(`Título de local inválido: ${title}`)
   const [, codigoEtec, tipoLocal, codigoLocal, municipio, nome, administrative = 'Região Metropolitana de São Paulo', government = '-'] = head
   const codigoCompleto = `E${codigoEtec}.${tipoLocal}${codigoLocal}`
@@ -108,7 +108,7 @@ const xlsxRows = (file) => {
 export function parseInscricoes(html, source = 'source.xls') {
   const sourceDate = html.match(/(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}:\d{2})/)
   if (!sourceDate) throw new Error('Data/hora de referência ausente no arquivo; informe-a na importação.')
-  const titles = [...html.matchAll(/E(\d{4})\.([SME])(\d{4})\s+-\s+([\s\S]*?)<\/strong>/gi)]
+  const titles = [...html.matchAll(/E(\d{4})\.([SMEF])(\d{4})\s+-\s+([\s\S]*?)<\/strong>/gi)]
   const locais = []; const ofertas = []
   for (let index = 0; index < titles.length; index++) {
     const match = titles[index]; const title = decode(match[0]); const next = titles[index + 1]?.index ?? html.length
@@ -140,7 +140,7 @@ export async function parseInscricoesXlsx(file, source = 'source.xlsx') {
   const rows = xlsxRows(file)
 
   const sourceDate = rows.flat().join(' ').match(/(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}:\d{2})/)
-  const sectionStarts = rows.flatMap((values, index) => /^E\d{4}\.[SME]\d{4}\s+-/i.test(values[0]) ? [{ index, title: values[0] }] : [])
+  const sectionStarts = rows.flatMap((values, index) => /^E\d{4}\.[SMEF]\d{4}\s+-/i.test(values[0]) ? [{ index, title: values[0] }] : [])
   const locais = []; const ofertas = []
 
   for (let sectionIndex = 0; sectionIndex < sectionStarts.length; sectionIndex++) {
