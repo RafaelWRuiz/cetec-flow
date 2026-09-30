@@ -26,6 +26,7 @@ const mapRegionalFallbackByMunicipality=new Map([['campinas','Campinas Sul']])
 type HistoryPoint={referenceAt:string;total:number;paid:number;unpaid:number;trainee:number;regular:number;vacancies:number}; type ChartData=Enrollment[]&{history?:HistoryPoint[]}
 type CoursePeriod='all'|'morning'|'afternoon'|'night'
 type CourseRow={course:string;paid:number;unpaid:number;vacancies:number}
+type CourseChartRow=CourseRow&{offerCount:number;periods:string[]}
 const offerStatusFor=(item:Enrollment):OfferStatus=>{const demand=item.vacancies?item.paid/item.vacancies:0;return demand>=1.5?'comfortable':demand>=1?'attention':'low'}
 const situationFor=(regular:number,vacancies:number):RegionalStatus=>!vacancies?'unavailable':regular/vacancies>=1.5?'comfortable':regular/vacancies>=1?'attention':'low'
 const situationLabel=(status:RegionalStatus)=>status==='comfortable'?'Confortável':status==='attention'?'Atenção':status==='low'?'Baixa demanda':'Sem vagas'
@@ -121,7 +122,7 @@ function TrendChart({data,target}:{data:ChartData;target:number}){
 <p className="chart-footnote">Dados acumulados por dia de inscricao</p>
 </div>
 }
-function CourseChart({rows,summaryData,scope,asOf,period,onPeriodChange}:{rows:CourseRow[];summaryData:Enrollment[];scope:string;asOf:string;period:CoursePeriod;onPeriodChange:(period:CoursePeriod)=>void}){
+function CourseChart({rows,summaryData,scope,asOf,period,onPeriodChange,statusFiltered}:{rows:CourseChartRow[];summaryData:Enrollment[];scope:string;asOf:string;period:CoursePeriod;onPeriodChange:(period:CoursePeriod)=>void;statusFiltered:boolean}){
  const orderedRows=[...rows].sort((a,b)=>(((b.paid+b.unpaid)/Math.max(b.vacancies,1))-((a.paid+a.unpaid)/Math.max(a.vacancies,1)))||((b.paid+b.unpaid)-(a.paid+a.unpaid))||a.course.localeCompare(b.course,'pt-BR'))
  const [activeCourse,setActiveCourse]=useState<string>('')
  const [summaryFeedback,setSummaryFeedback]=useState('')
@@ -147,7 +148,8 @@ function CourseChart({rows,summaryData,scope,asOf,period,onPeriodChange}:{rows:C
   return [`*VESTIBULINHO 2027*`,`${whatsappIcons.location} ${scope.replace('Sao','São')} · ${generatedAt}`,`Inscrições: ${number.format(summaryTotals.total)} | Não pagos: ${number.format(summaryTotals.unpaid)}`,'',...separatedSections,'',`${whatsappIcons.target} Meta: 1,5 candidatos por vaga`].join('\n')
  }
  const copySummary=async()=>{try{await navigator.clipboard.writeText(shareSummary());setSummaryFeedback('Resumo copiado.')}catch{setSummaryFeedback('Não foi possível copiar o resumo.')}}
- return <div className="course-chart">
+ return <div className={`course-chart${statusFiltered?' has-status-note':''}`}>
+{statusFiltered&&<p className="course-status-note">Filtro de situação: cada turma é classificada por pagos ÷ vagas. O gráfico soma, por curso, apenas as turmas selecionadas.</p>}
 <div className="course-plot-shell">
 <div className="course-plot" role="img" aria-label="Demanda por curso, com barras de pagos, não pagos e meta de 1,5 inscritos por vaga">
 <div className="course-bars-header">
@@ -166,6 +168,7 @@ function CourseChart({rows,summaryData,scope,asOf,period,onPeriodChange}:{rows:C
 <strong>Inscritos: {number.format(row.total)}</strong>
 <span>({number.format(row.paid)} pagos | {number.format(row.unpaid)} pendentes)</span>
 <small>{number.format(row.vacancies)} vagas · {row.paidDemand.toFixed(1).replace('.',',')}x pagos/vaga</small>
+<small>{row.offerCount} {row.offerCount===1?'turma':'turmas'} · {row.periods.join(' + ')}</small>
 </span>}
 </CourseRowTrack>
 </button>})}
@@ -194,7 +197,7 @@ export default function App(){
  const matchesPresentialOfferScope=(item:Enrollment)=>!item.isTrainee&&!isEadOffer(item)&&matchesBaseScope(item)
  const scopedHistory=visibleSnapshotSeries.map(({referenceAt,enrollments:items})=>{const scoped=items.filter(matchesActiveScope);const regular=scoped.filter(item=>!item.isTrainee);const paid=scoped.reduce((sum,item)=>sum+item.paid,0);const unpaid=scoped.reduce((sum,item)=>sum+item.unpaid,0);const trainee=scoped.filter(item=>item.isTrainee).reduce((sum,item)=>sum+item.paid+item.unpaid,0);const vacancies=regular.reduce((sum,item)=>sum+item.vacancies,0);return {referenceAt,total:paid+unpaid,paid,unpaid,trainee,regular:paid+unpaid-trainee,vacancies}})
  const data=Object.assign(enrollments.filter(matchesActiveScope),{history:scopedHistory}) as ChartData
- const courseRows=[...data.filter(item=>!item.isTrainee&&matchesCoursePeriod(item.period,coursePeriod)).reduce((rows,item)=>{const current=rows.get(item.course)??{course:item.course,paid:0,unpaid:0,vacancies:0};current.paid+=item.paid;current.unpaid+=item.unpaid;current.vacancies+=item.vacancies;rows.set(item.course,current);return rows},new Map<string,CourseRow>()).values()].sort((a,b)=>b.paid-a.paid||a.course.localeCompare(b.course,'pt-BR'))
+ const courseRows=[...data.filter(item=>!item.isTrainee&&matchesCoursePeriod(item.period,coursePeriod)).reduce((rows,item)=>{const current=rows.get(item.course)??{course:item.course,paid:0,unpaid:0,vacancies:0,offerCount:0,periods:[] as string[]};current.paid+=item.paid;current.unpaid+=item.unpaid;current.vacancies+=item.vacancies;current.offerCount++;if(!current.periods.includes(item.period))current.periods.push(item.period);rows.set(item.course,current);return rows},new Map<string,CourseChartRow>()).values()].sort((a,b)=>b.paid-a.paid||a.course.localeCompare(b.course,'pt-BR'))
  const totals=data.reduce((r,item)=>({paid:r.paid+item.paid,unpaid:r.unpaid+item.unpaid,vacancies:r.vacancies+(item.isTrainee?0:item.vacancies),target:r.target+item.target,trainee:r.trainee+(item.isTrainee?item.paid+item.unpaid:0),regular:r.regular+(item.isTrainee?0:item.paid+item.unpaid),regularPaid:r.regularPaid+(item.isTrainee?0:item.paid)}),{paid:0,unpaid:0,vacancies:0,target:0,trainee:0,regular:0,regularPaid:0})
  const total=totals.paid+totals.unpaid
  const presentialOfferData=enrollments.filter(matchesPresentialOfferScope)
@@ -326,7 +329,7 @@ export default function App(){
 <button type="button" role="tab" aria-selected={analysisTab==='performance'} className={analysisTab==='performance'?'active':''} onClick={()=>setAnalysisTab('performance')}>{performanceTabLabel}</button>
 <button type="button" role="tab" aria-selected={analysisTab==='reports'} className={analysisTab==='reports'?'active':''} onClick={()=>setAnalysisTab('reports')}>Relatórios</button>
 </div>
-{analysisTab==='evolution'?<TrendChart data={data} target={totals.target}/>:analysisTab==='courses'?<CourseChart rows={courseRows} summaryData={data.filter(item=>!item.isTrainee)} scope={whatsappScope} asOf={rangeEndAt} period={coursePeriod} onPeriodChange={setCoursePeriod}/>:analysisTab==='reports'?<EnrollmentReports snapshots={visibleSnapshotSeries.map(snapshot=>({...snapshot,enrollments:snapshot.enrollments.filter(matchesActiveScope)}))} scope={`${scopeSummary} · ${enrollmentScope}`} groupLabel={performanceColumn} groupFor={item=>performanceDimension==='course'?item.course:performanceDimension==='municipality'?cityFor(item):regionalFor(item)} statusFiltered={Boolean(statusFilter)}/>:<div className="regional-table analysis-regional-table">
+{analysisTab==='evolution'?<TrendChart data={data} target={totals.target}/>:analysisTab==='courses'?<CourseChart rows={courseRows} summaryData={data.filter(item=>!item.isTrainee)} scope={whatsappScope} asOf={rangeEndAt} period={coursePeriod} onPeriodChange={setCoursePeriod} statusFiltered={Boolean(statusFilter)}/>:analysisTab==='reports'?<EnrollmentReports snapshots={visibleSnapshotSeries.map(snapshot=>({...snapshot,enrollments:snapshot.enrollments.filter(matchesActiveScope)}))} scope={`${scopeSummary} · ${enrollmentScope}`} groupLabel={performanceColumn} groupFor={item=>performanceDimension==='course'?item.course:performanceDimension==='municipality'?cityFor(item):regionalFor(item)} statusFiltered={Boolean(statusFilter)}/>:<div className="regional-table analysis-regional-table">
 <div className="regional-head">
 {performanceHeaders.map(([key,label])=>{const active=performanceSort.key===key;return <button type="button" className={`regional-sort${active?' active':''}`} key={key} onClick={()=>togglePerformanceSort(key)} aria-label={`Ordenar por ${label}${active?`, ordem ${performanceSort.direction==='asc'?'crescente':'decrescente'}`:''}`}><span>{label}</span>{active&&<i className="regional-sort-arrow" aria-hidden="true">{performanceSort.direction==='asc'?'▲':'▼'}</i>}</button>})}
 </div>{sortedPerformanceRows.map(row=>

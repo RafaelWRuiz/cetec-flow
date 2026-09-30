@@ -391,6 +391,8 @@ footer {
 .analysis-tabs .analysis-back { margin-left: auto; border: 1px solid var(--cps-border); border-radius: 4px; padding: 4px 7px; color: var(--cps-text-secondary); font-size: 10px; }
 .analysis-tabs .analysis-back:hover { border-color: var(--cps-blue); color: var(--cps-blue-dark); background: var(--cps-hover); }
 .course-chart { position: relative; display: grid; grid-template-rows: minmax(0, 1fr) auto; gap: 10px; flex: 1; min-height: 0; padding: 14px 14px 12px; color: var(--cps-text); background: var(--cps-surface); }
+.course-chart.has-status-note { grid-template-rows: auto minmax(0, 1fr) auto; }
+.course-status-note { margin: 0; padding: 7px 10px; border-radius: 6px; color: var(--cps-blue-dark); background: var(--cps-hover); font-size: 11px; line-height: 1.35; }
 .course-plot-shell { display: grid; min-height: 0; overflow: hidden; }
 .course-plot { display: grid; grid-template-rows: auto minmax(0, 1fr); gap: 10px; min-height: 0; height: 100%; }
 .course-bars-header { display: flex; justify-content: center; gap: 18px; padding: 0; color: var(--cps-text-secondary); font-size: 11px; font-weight: 700; }
