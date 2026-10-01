@@ -17,7 +17,7 @@ const apiBaseUrl=(import.meta.env.VITE_API_BASE_URL??'').replace(/\/$/,'')
 const apiUrl=(path:string)=>`${apiBaseUrl}${path}`
 const readJson=async<T,>(response:Response):Promise<T>=>{const text=await response.text();if(!text)return {} as T;try{return JSON.parse(text) as T}catch{throw new Error(response.ok?'O servidor respondeu em um formato inválido.':text)}}
 const formatSnapshotDate=(value:string)=>{const date=new Date(value);return Number.isNaN(date.getTime())?value:date.toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})}
-const normalizeName=(value:string)=>value.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim()
+const normalizeName=(value:string)=>value.replace(/&#(\d+);/g,(_,code)=>String.fromCodePoint(Number(code))).replace(/&#x([\da-f]+);/gi,(_,code)=>String.fromCodePoint(parseInt(code,16))).replace(/&apos;|&rsquo;|&lsquo;/gi,"'").replace(/[’‘`´]/g,"'").normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\s+/g,' ').trim()
 const compactCourseName=(value:string)=>value.replace(/^Ensino Médio com Habilitação Profissional de Técnico em\s+/i,'EM Técnico em ').replace(/^Ensino Médio com Habilitação Profissional\s+/i,'EM Profissional ')
 const chartCourseName=(value:string)=>compactCourseName(value).replace(/Técnico em\s+/i,'')
 const formatEtecLabel=(etec:EtecPoint)=>{const code=etec.name.split('.')[0].replace(/^E0*/i,'').padStart(3,'0');const name=etec.label.replace(/\s*\([^)]*\)\s*$/,'').replace(/^Etec\s+/i,'');return `${code} - ${name}`}
