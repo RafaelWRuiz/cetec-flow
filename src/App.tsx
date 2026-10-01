@@ -74,11 +74,23 @@ function SelectFilter({label,value,values,onChange,etecOptions=[]}:{label:string
 </div>
 }
 function TrendChart({data,target}:{data:ChartData;target:number}){
- const svgRef=useRef<SVGSVGElement>(null); const [viewHeight,setViewHeight]=useState(265); const [historyFrequency,setHistoryFrequency]=useState<'auto'|'all'|'weekly'>('auto')
+ const svgRef=useRef<SVGSVGElement>(null); const [viewHeight,setViewHeight]=useState(265); const [historyFrequency,setHistoryFrequency]=useState<'auto'|'all'|'weekly'>('auto'); const [chartView,setChartView]=useState<'accumulated'|'dailyPaid'>('accumulated')
  useEffect(()=>{const svg=svgRef.current;if(!svg)return undefined;const update=()=>{if(!svg.clientWidth)return;const next=Math.max(265,Math.round(svg.clientHeight/svg.clientWidth*680));setViewHeight(current=>current===next?current:next)};const observer=new ResizeObserver(update);observer.observe(svg);update();return()=>observer.disconnect()},[])
  const plotTop=38; const plotBottom=viewHeight-52; const plotHeight=plotBottom-plotTop
  if(!data.some(item=>item.daily.length)){
-  const history=data.history??[]
+ const history=data.history??[]
+  if(chartView==='dailyPaid'){
+   const dayKey=(value:string)=>new Date(value).toLocaleDateString('en-CA',{timeZone:'America/Sao_Paulo'})
+   const latestByDay=new Map<string,HistoryPoint>(); history.forEach(point=>latestByDay.set(dayKey(point.referenceAt),point))
+   const dailyHistory=[...latestByDay.values()].sort((a,b)=>Date.parse(a.referenceAt)-Date.parse(b.referenceAt))
+   const dailyPoints=dailyHistory.map((point,index)=>({point,value:index?Math.max(0,point.paid-dailyHistory[index-1].paid):point.paid}))
+   const maxDaily=Math.max(...dailyPoints.map(point=>point.value),1); const magnitude=10**Math.floor(Math.log10(maxDaily)); const normalized=maxDaily/magnitude; const dailyMax=(normalized<=1?1:normalized<=2?2:normalized<=5?5:10)*magnitude; const tickStep=dailyMax<=5?1:dailyMax/5; const dailyTicks=Array.from({length:Math.round(dailyMax/tickStep)+1},(_,index)=>index*tickStep); const plotLeft=74; const plotRight=644; const dailyPointsWithPosition=dailyPoints.map((point,index)=>{const x=dailyPoints.length===1?(plotLeft+plotRight)/2:plotLeft+index*(plotRight-plotLeft)/(dailyPoints.length-1);return {...point,x,y:plotBottom-point.value/dailyMax*plotHeight}}); const visiblePointIndexes=historyFrequency==='all'?new Set(dailyPointsWithPosition.map((_,index)=>index)):(()=>{const count=Math.min(dailyPointsWithPosition.length,8);return new Set(Array.from({length:count},(_,index)=>count===1?0:Math.round(index*(dailyPointsWithPosition.length-1)/(count-1))))})(); const latest=dailyPointsWithPosition.at(-1)
+   return <div className="trend">
+<div className="chart-legend chart-history-legend"><div className="chart-history-toolbar"><div className="chart-history-series"><span className="legend-daily-paid">Novos pagos por dia</span></div><button type="button" className="chart-history-toggle" onClick={()=>setChartView('accumulated')}>Ver acumulado</button><label className="chart-history-frequency">Pontos <select aria-label="Frequência dos pontos do gráfico" value={historyFrequency} onChange={event=>setHistoryFrequency(event.target.value as 'auto'|'all'|'weekly')}><option value="auto">Automático</option><option value="all">Todas as importações</option><option value="weekly">Semanal</option></select></label></div></div>
+<svg ref={svgRef} viewBox={`0 0 680 ${viewHeight}`} role="img" aria-label="Novas inscrições pagas por dia"><g className="chart-grid">{dailyTicks.map(value=>{const y=plotBottom-value/dailyMax*plotHeight;return <g key={value}><line x1={plotLeft} x2={plotRight} y1={y} y2={y}/><text className="chart-axis-label" x={plotLeft-10} y={y+3} textAnchor="end">{number.format(value)}</text></g>})}</g><line className="chart-axis" x1={plotLeft} x2={plotRight} y1={plotBottom} y2={plotBottom}/><text className="chart-axis-title" transform={`rotate(-90 17 ${(plotTop+plotBottom)/2})`} x="17" y={(plotTop+plotBottom)/2} textAnchor="middle">Novos pagos</text><polyline className="chart-line chart-daily-paid-line" points={dailyPointsWithPosition.map(({x,y})=>`${x},${y}`).join(' ')}/>{dailyPointsWithPosition.map(({point,value,x,y},pointIndex)=><g key={point.referenceAt}>{visiblePointIndexes.has(pointIndex)&&<><title>{`${new Date(point.referenceAt).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})} · ${number.format(value)} novos pagos`}</title><circle className="chart-daily-paid-dot" cx={x} cy={y} r="3.5"/><text className="chart-daily-paid-value" x={x} y={y-10} textAnchor="middle">{number.format(value)}</text><text className="chart-date" x={x} y={plotBottom+25} textAnchor="middle">{new Date(point.referenceAt).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})}</text></>}</g>)}{latest&&<text className="chart-latest-value chart-daily-paid-latest" x={latest.x} y={latest.y-22} textAnchor="middle">{number.format(latest.value)}</text>}</svg>
+<p className="chart-footnote">Variação positiva de inscritos pagos em relação à última importação de cada dia.</p>
+</div>
+  }
   const maxCount=Math.max(...history.map(point=>Math.max(point.total,point.paid)),1)
   const magnitude=10**Math.floor(Math.log10(maxCount)); const normalized=maxCount/magnitude; const yMax=(normalized<=1?1:normalized<=2?2:normalized<=5?5:10)*magnitude; const tickStep=yMax<=5?1:yMax/5; const yTicks=Array.from({length:Math.round(yMax/tickStep)+1},(_,index)=>index*tickStep); const axisLabel=(value:number)=>value>=1000?`${number.format(value/1000)} mil`:number.format(value)
   const plotLeft=74; const plotRight=644
@@ -93,7 +105,7 @@ function TrendChart({data,target}:{data:ChartData;target:number}){
 <div className="chart-history-toolbar">
 <div className="chart-history-series">
 <span className="legend-total">Inscritos totais</span><span className="legend-paid">Inscritos pagos</span>
-</div>
+</div><button type="button" className="chart-history-toggle" onClick={()=>setChartView('dailyPaid')}>Ver novos pagos por dia</button>
 <label className="chart-history-frequency">Pontos <select aria-label="Frequência dos pontos do gráfico" value={historyFrequency} onChange={event=>setHistoryFrequency(event.target.value as 'auto'|'all'|'weekly')}><option value="auto">Automático</option><option value="all">Todas as importações</option><option value="weekly">Semanal</option></select></label>
 </div>
 </div>
@@ -326,12 +338,12 @@ export default function App(){
 <article className="panel map-panel">
 <div className="panel-header map-panel-header">
 <h2>Distribuição geográfica das inscrições pagas</h2>
-<label className="map-status-toggle"><input type="checkbox" checked={colorMapByStatus} onChange={event=>setColorMapByStatus(event.target.checked)}/><span>Situação</span></label>
-<span>{visible.length} locais</span>
+<label className="map-status-toggle"><input type="checkbox" checked={colorMapByStatus} onChange={event=>setColorMapByStatus(event.target.checked)}/><span>Mapa de calor</span></label>
+<span>{number.format(visible.length)} {visible.length===1?'local':'locais'}</span>
 </div>
 <div className="map-visual">
 <D3GeographicMap etecs={etecs} selected={selectedEtec} visible={visible} selectedRegionals={highlightedMapRegionals} selectedMunicipalities={selectedMapMunicipalities} focusedRegional={focusedMapRegional} focusedMunicipality={focusedMapMunicipality} resetKey={mapResetKey} regionalStatuses={mapRegionalStatuses} regionalLowDemandRates={mapRegionalLowDemandRates} municipalityLowDemandRates={mapMunicipalityLowDemandRates} regionalLocationStatusCounts={regionalLocationStatusCounts} municipalityLocationStatusCounts={municipalityLocationStatusCounts} colorByStatus={colorMapByStatus} mapStatusKey={mapStatusKey} onSelect={selectEtec} onGeographicSelect={selectGeographicScope} onRegionalCitiesSelect={selectRegionalCities} onGeographicClear={clearGeographicScope}/>
-{colorMapByStatus&&<div className="map-status-legend" role="img" aria-label="Escala de situação: vermelho indica baixa demanda e verde indica demanda confortável"><strong>Situação</strong><div className="map-status-gradient" aria-hidden="true"/><div className="map-status-labels"><span>Baixa demanda</span><span>Demanda confortável</span></div></div>}
+{colorMapByStatus&&<div className="map-status-legend" role="img" aria-label="Escala do mapa de calor: vermelho indica baixa demanda e verde indica demanda confortável"><strong>Mapa de calor</strong><div className="map-status-gradient" aria-hidden="true"/><div className="map-status-labels"><span>Baixa demanda</span><span>Demanda confortável</span></div></div>}
 </div>
 <p className="panel-note">Navegue pelas regionais e municípios, ou clique em um local para filtrar o painel.</p>
 </article>
@@ -341,9 +353,9 @@ export default function App(){
 </div>
 <div className="analysis-tabs" role="tablist" aria-label="Análises">
 <button type="button" role="tab" aria-selected={analysisTab==='evolution'} className={analysisTab==='evolution'?'active':''} onClick={()=>setAnalysisTab('evolution')}>Evolução</button>
-<button type="button" role="tab" aria-selected={analysisTab==='courses'} className={analysisTab==='courses'?'active':''} onClick={()=>setAnalysisTab('courses')}>Cursos</button>
-<button type="button" role="tab" aria-selected={analysisTab==='performance'} className={analysisTab==='performance'?'active':''} onClick={()=>setAnalysisTab('performance')}>{performanceTabLabel}</button>
 <button type="button" role="tab" aria-selected={analysisTab==='reports'} className={analysisTab==='reports'?'active':''} onClick={()=>setAnalysisTab('reports')}>Relatórios</button>
+<button type="button" role="tab" aria-selected={analysisTab==='performance'} className={analysisTab==='performance'?'active':''} onClick={()=>setAnalysisTab('performance')}>{performanceTabLabel}</button>
+<button type="button" role="tab" aria-selected={analysisTab==='courses'} className={analysisTab==='courses'?'active':''} onClick={()=>setAnalysisTab('courses')}>Cursos</button>
 </div>
 {analysisTab==='evolution'?<TrendChart data={data} target={totals.target}/>:analysisTab==='courses'?<CourseChart rows={courseRows} summaryData={data.filter(item=>!item.isTrainee)} periodLabelData={enrollments.filter(item=>!item.isTrainee&&matchesAnalysisScope(item)&&matchesBaseScope(item))} scope={whatsappScope} asOf={rangeEndAt} period={coursePeriod} onPeriodChange={setCoursePeriod} statusFiltered={Boolean(statusFilter)}/>:analysisTab==='reports'?<EnrollmentReports snapshots={visibleSnapshotSeries.map(snapshot=>({...snapshot,enrollments:snapshot.enrollments.filter(matchesActiveScope)}))} scope={`${scopeSummary} · ${enrollmentScope}`} statusFiltered={Boolean(statusFilter)}/>:<div className="regional-table analysis-regional-table">
 <div className="regional-head">
