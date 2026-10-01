@@ -189,7 +189,15 @@ export default function D3GeographicMap({ etecs, selected, visible, selectedRegi
     const width = Math.max(containerSize.width || container.clientWidth, 320)
     const height = Math.max(containerSize.height || container.clientHeight, 220)
     const theme = buildMapTheme(container)
-    const heatColorFor = (rate: number | undefined) => rate === undefined ? theme.municipalNeutralStroke : mixColor(theme.stateFill, theme.statusPalette.low, Math.max(0.12, Math.min(1, rate)))
+    const heatColorFor = (rate: number | undefined) => {
+      if (rate === undefined) return theme.municipalNeutralStroke
+      const normalized = Math.max(0, Math.min(1, rate))
+      const vivid = normalized <= .5
+        ? mixColor(theme.statusPalette.comfortable, theme.statusPalette.attention, normalized / .5)
+        : mixColor(theme.statusPalette.attention, theme.statusPalette.low, (normalized - .5) / .5)
+      // Keep the map soft enough for labels while preserving a continuous, visible scale.
+      return mixColor(vivid, theme.stateFill, .22)
+    }
     // Keep a compact label zone so the state itself uses the available map height.
     const stateBottomPadding = Math.max(20, Math.round(height * 0.07))
     const projection = d3.geoMercator().fitExtent([[20, 8], [width - 20, height - stateBottomPadding]], REGIONAIS as d3.ExtendedFeatureCollection)

@@ -10,6 +10,11 @@
 .enrollment-reports :focus-visible, .reports-dialog :focus-visible { outline: 2px solid var(--cps-blue); outline-offset: 2px; }
 .reports-scope, .reports-note { margin: 0; color: var(--cps-text-secondary); font-size: 12px; line-height: 1.5; }
 .reports-scope { font-weight: 600; }
+.reports-weekend-legend { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; min-height: 22px; color: var(--cps-text-secondary); font-size: 11px; }
+.reports-weekend-legend span { display: inline-flex; align-items: center; gap: 5px; }
+.reports-day-swatch { display: inline-block; width: 12px; height: 12px; border-radius: 3px; }
+.reports-day-saturday { background: color-mix(in srgb, var(--cps-cyan) 7%, var(--cps-surface)); }
+.reports-day-sunday { background: color-mix(in srgb, var(--cps-attention) 7%, var(--cps-surface)); }
 .reports-dates { display: flex; flex-wrap: wrap; gap: 12px; }
 .reports-dates label { display: grid; flex: 1; gap: 5px; min-width: 160px; font-size: 12px; }
 .reports-dates select { width: 100%; min-height: 36px; border: 1px solid var(--cps-border); border-radius: 4px; padding: 6px; color: var(--cps-text); background: var(--cps-surface); font: inherit; }
@@ -20,6 +25,9 @@
 .reports-table-scroll tbody th { min-width: 170px; max-width: 300px; white-space: normal; font-weight: 500; }
 .reports-table-scroll thead th { position: sticky; top: 0; background: var(--cps-hover); color: var(--cps-blue-dark); font-size: 11px; z-index: 1; }
 .reports-table-scroll tbody tr:hover { background: var(--cps-hover); }
+.reports-table-scroll tbody tr.reports-day-saturday { background: color-mix(in srgb, var(--cps-cyan) 7%, var(--cps-surface)); }
+.reports-table-scroll tbody tr.reports-day-sunday { background: color-mix(in srgb, var(--cps-attention) 7%, var(--cps-surface)); }
+.reports-table-scroll tbody tr.reports-day-saturday:hover, .reports-table-scroll tbody tr.reports-day-sunday:hover { background: var(--cps-hover); }
 .reports-table-scroll tfoot { font-weight: 700; background: var(--cps-hover); }
 .reports-dialog[open] { display: flex; flex-direction: column; gap: 14px; position: fixed; inset: 0; width: 100%; height: 100dvh; max-width: none; max-height: none; margin: 0; box-sizing: border-box; border: 0; padding: 24px; background: var(--cps-surface); color: var(--cps-text); }
 .reports-dialog .reports-table-scroll { max-height: none; }
