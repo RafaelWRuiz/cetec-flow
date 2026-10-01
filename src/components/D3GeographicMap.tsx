@@ -165,6 +165,13 @@ export default function D3GeographicMap({ etecs, selected, visible, selectedRegi
   }, [selected, visible])
 
   useEffect(() => {
+    d3.select(containerRef.current).selectAll<SVGGElement, UnitPoint>('.ared-unit-marker').each(function (point) {
+      const isSaoPaulo = d3.select(this).classed('is-sao-paulo-unit')
+      d3.select(this).select('.ared-unit-dot').attr('r', isSaoPaulo ? (point.etec.name === selected ? 4.2 : 2.5) : (point.etec.name === selected ? 6.5 : 5.2))
+    })
+  }, [selected])
+
+  useEffect(() => {
     etecsRef.current = etecs
   }, [etecs])
 
@@ -290,7 +297,7 @@ export default function D3GeographicMap({ etecs, selected, visible, selectedRegi
             activeMunicipality = municipality
             focus(municipality)
             municipalityLayer.selectAll<SVGPathElement, Feature>('.ared-mun-path').classed('selected', (item) => String(item.properties.name) === municipality).transition().duration(200).attr('opacity', (item) => String(item.properties.name) === municipality ? 1 : 0.18)
-            municipalityLayer.selectAll<SVGGElement, UnitPoint>('.ared-unit-marker').transition().duration(200).attr('opacity', (item) => item.etec.name === point.etec.name ? 1 : 0.18)
+            municipalityLayer.selectAll<SVGGElement, UnitPoint>('.ared-unit-marker').transition().duration(200).attr('opacity', (item) => item.etec.name === point.etec.name ? 1 : normalize(item.etec.municipality) === normalize(municipality) && markerState.current.visible.includes(item.etec.name) ? 0.7 : 0.18)
             callbacks.current.onSelect(point.etec.name)
           }).on('keydown', (event) => { if (event.key === 'Enter' || event.key === ' ') marker.dispatch('click') })
           marker.transition().duration(420).delay(250 + index * 45).attr('opacity', markerState.current.visible.includes(point.etec.name) ? 1 : 0.18)
