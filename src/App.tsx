@@ -272,6 +272,7 @@ export default function App(){
 <SelectFilter label="Cidade" value={filters.city} values={options.city} onChange={value=>updateFilter('city',value)}/>
 <SelectFilter label="Etec" value={filters.etec} values={options.etec} onChange={value=>updateFilter('etec',value)} etecOptions={etecs}/>
 <SelectFilter label="Eixo tecnológico" value={filters.axis} values={options.axis} onChange={value=>updateFilter('axis',value)}/>
+<SelectFilter label="Tipo de oferta" value={filters.offerType} values={options.offerType} onChange={value=>updateFilter('offerType',value)}/>
 <SelectFilter label="Curso" value={filters.course} values={options.course} onChange={value=>updateFilter('course',value)}/>
 <SelectFilter label="Periodo" value={filters.period} values={options.period} onChange={value=>updateFilter('period',value)}/>
 <button className="clear-button" type="button" onClick={()=>{clearFilters();setMobileMenuOpen(false)}}>Limpar filtros</button>
@@ -286,6 +287,7 @@ export default function App(){
 <SelectFilter label="Cidade" value={filters.city} values={options.city} onChange={value=>updateFilter('city',value)}/>
 <SelectFilter label="Etec" value={filters.etec} values={options.etec} onChange={value=>updateFilter('etec',value)} etecOptions={etecs}/>
 <SelectFilter label="Eixo tecnológico" value={filters.axis} values={options.axis} onChange={value=>updateFilter('axis',value)}/>
+<SelectFilter label="Tipo de oferta" value={filters.offerType} values={options.offerType} onChange={value=>updateFilter('offerType',value)}/>
 <SelectFilter label="Curso" value={filters.course} values={options.course} onChange={value=>updateFilter('course',value)}/>
 <SelectFilter label="Periodo" value={filters.period} values={options.period} onChange={value=>updateFilter('period',value)}/>
 <button className="clear-button" type="button" onClick={clearFilters}>Limpar filtros</button>
