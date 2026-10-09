@@ -81,6 +81,22 @@ footer { display: flex; justify-content: space-between; padding: 16px max(28px, 
   background: var(--cps-bg);
 }
 
+/* Faixas de demanda e conversão atualizadas. */
+.ared-tip-statuses span.status-competitive, .analysis-regional-table .status-competitive, .offer-status-kpi .demand-competitive .status-progress-label-outside, .offer-status-kpi .demand-competitive .status-progress-label-tone, .performance-conversion.conversion-ideal { color: var(--cps-success); }
+.ared-tip-statuses span.status-acceptable, .analysis-regional-table .status-acceptable, .offer-status-kpi .demand-acceptable .status-progress-label-outside, .offer-status-kpi .demand-acceptable .status-progress-label-tone, .performance-conversion.conversion-acceptable { color: var(--cps-cyan); }
+.ared-tip-statuses span.status-attention, .analysis-regional-table .status-attention, .offer-status-kpi .demand-attention .status-progress-label-outside, .offer-status-kpi .demand-attention .status-progress-label-tone { color: var(--cps-attention); }
+.ared-tip-statuses span.status-bad, .analysis-regional-table .status-bad, .offer-status-kpi .demand-bad .status-progress-label-outside, .offer-status-kpi .demand-bad .status-progress-label-tone, .performance-conversion.conversion-bad { color: var(--cps-coral); }
+.ared-tip-statuses span.status-critical, .analysis-regional-table .status-critical, .offer-status-kpi .demand-critical .status-progress-label-outside, .offer-status-kpi .demand-critical .status-progress-label-tone, .performance-conversion.conversion-critical { color: var(--cps-error); }
+.offer-status-kpi .demand-competitive .status-progress i { background: var(--cps-success); }
+.offer-status-kpi .demand-acceptable .status-progress i { background: var(--cps-cyan); }
+.offer-status-kpi .demand-attention .status-progress i { background: var(--cps-attention); }
+.offer-status-kpi .demand-bad .status-progress i { background: var(--cps-coral); }
+.offer-status-kpi .demand-critical .status-progress i { background: var(--cps-error); }
+.offer-status-kpi .status-list { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+@media (max-width: 1199px) { .offer-status-kpi .status-list { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 620px) { .offer-status-kpi .status-list { grid-template-columns: 1fr; } }
+.performance-conversion { font-weight: 700; white-space: nowrap; }
+
 body, .app-shell { background: var(--cps-bg); color: var(--cps-text); }
 .institutional-header { color: var(--cps-surface); background: var(--cps-blue); }
 .brand-divider { background: rgba(255, 255, 255, .45); }
@@ -761,4 +777,35 @@ footer::before { display: none !important; content: none !important; }
   .offer-status-kpi .status-progress { grid-column: 1 / -1; grid-row: 2; height: 10px; }
   .offer-status-kpi .status-progress-label { font-size: 9px !important; }
   .offer-status-kpi .status-progress-label-outside { right: 0; left: auto !important; transform: translate(0, -50%); }
+}
+/* Override after existing responsive rules for the five requested bands. */
+.offer-status-kpi .status-list { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+@media (max-width: 1199px) { .offer-status-kpi .status-list { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 620px) { .offer-status-kpi .status-list { grid-template-columns: 1fr; } }
+.performance-criteria { margin: 0 0 8px; color: var(--cps-text-secondary); font-size: 10px; }
+.performance-criteria summary { width: fit-content; color: var(--cps-blue); cursor: pointer; font-size: 10px; font-weight: 700; }
+.performance-criteria > div { display: flex; flex-wrap: wrap; gap: 5px 18px; padding: 7px 9px; border: 1px solid var(--cps-border); border-radius: 6px; background: var(--cps-surface-muted); }
+.performance-criteria p { margin: 0; line-height: 1.5; }
+.performance-criteria strong { color: var(--cps-text); }
+.map-heat-container { position: relative; display: flex; flex: 1; min-height: 0; }
+.map-heat-container > .ared-map { flex: 1; min-height: 0; }
+.map-heat-legend { position: absolute; left: 12px; bottom: 12px; z-index: 2; display: grid; gap: 6px; min-width: 142px; padding: 9px 11px; border: 1px solid var(--cps-border); border-radius: 7px; color: var(--cps-text-secondary); background: color-mix(in srgb, var(--cps-surface) 95%, transparent); box-shadow: 0 2px 8px rgba(15, 39, 76, .16); font-size: 9px; }
+.map-heat-legend strong { margin-bottom: 1px; color: var(--cps-text); font-size: 9px; }
+.map-heat-legend span { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.map-heat-legend i { width: 10px; height: 10px; border-radius: 2px; }
+.map-heat-legend .heat-competitive { background: var(--cps-success); }
+.map-heat-legend .heat-acceptable { background: var(--cps-cyan); }
+.map-heat-legend .heat-attention { background: var(--cps-attention); }
+.map-heat-legend .heat-bad { background: #E57373; }
+.map-heat-legend .heat-critical { background: #8B0000; }
+.daily-paid-action { flex: 0 0 auto; border: 1px solid var(--cps-border); border-radius: 6px; padding: 6px 10px; color: var(--cps-blue); background: var(--cps-surface); font: inherit; font-size: 10px; font-weight: 400; cursor: pointer; }
+.daily-paid-action:hover { border-color: var(--cps-blue); background: color-mix(in srgb, var(--cps-cyan) 7%, var(--cps-surface)); }
+.daily-paid-action:focus-visible { outline: 2px solid var(--cps-cyan); outline-offset: 2px; }
+.chart-history-toolbar { grid-template-columns: minmax(0, 1fr) auto auto auto minmax(0, 1fr); }
+.chart-history-series { grid-column: 2; }
+.chart-daily-paid-action { grid-column: 3; }
+.chart-history-frequency { grid-column: 4; }
+@media (max-width: 620px) {
+  .chart-history-toolbar { grid-template-columns: minmax(0, 1fr); gap: 7px; }
+  .chart-history-series, .chart-daily-paid-action, .chart-history-frequency { grid-column: 1; justify-self: center; }
 }

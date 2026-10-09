@@ -3,12 +3,15 @@ import * as d3 from 'd3'
 import { MUN_BY_REGIONAL, REGIONAIS, SAO_PAULO_FALLBACK_LOCATIONS, SAO_PAULO_UNIT_LOCATIONS, SP_BORDER, type MapFeatureCollection } from '../data/aredMapData'
 import type { EtecPoint } from '../data/mockData'
 
-type RegionalStatus = 'comfortable' | 'attention' | 'low' | 'unavailable'
-type OfferLocationStatusCounts = { total: number; comfortable: number; attention: number; low: number; label?: 'Locais de oferta' | 'Turmas' }
-type MapProps = { etecs: EtecPoint[]; selected: string; visible: string[]; selectedRegionals: string[]; selectedMunicipalities: string[]; focusedRegional: string; focusedMunicipality: string; resetKey: number; regionalStatuses: Record<string, RegionalStatus>; regionalLowDemandRates: Record<string, number>; municipalityLowDemandRates: Record<string, number>; regionalLocationStatusCounts: Record<string, OfferLocationStatusCounts>; municipalityLocationStatusCounts: Record<string, OfferLocationStatusCounts>; colorByStatus: boolean; mapStatusKey: string; onSelect: (name: string) => void; onGeographicSelect: (label: string, etecs: string[]) => void; onRegionalCitiesSelect: (regional: string) => void; onGeographicClear: () => void }
+type RegionalStatus = 'competitive' | 'acceptable' | 'attention' | 'bad' | 'critical' | 'unavailable'
+type OfferLocationStatusCounts = { total: number; competitive: number; acceptable: number; attention: number; bad: number; critical: number; label?: 'Locais de oferta' | 'Turmas' }
+type MapProps = { etecs: EtecPoint[]; selected: string; visible: string[]; selectedRegionals: string[]; selectedMunicipalities: string[]; focusedRegional: string; focusedMunicipality: string; resetKey: number; regionalDemands: Record<string, number>; municipalityDemands: Record<string, number>; regionalLocationStatusCounts: Record<string, OfferLocationStatusCounts>; municipalityLocationStatusCounts: Record<string, OfferLocationStatusCounts>; colorByStatus: boolean; mapStatusKey: string; onSelect: (name: string) => void; onGeographicSelect: (label: string, etecs: string[]) => void; onRegionalCitiesSelect: (regional: string) => void; onGeographicClear: () => void }
 type Feature = MapFeatureCollection['features'][number]
 type UnitPoint = { etec: EtecPoint; x: number; y: number; originX: number; originY: number }
 const normalize = (value: string) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+const demandStatusForMap = (value: number): Exclude<RegionalStatus, 'unavailable'> => value >= 2 ? 'competitive' : value >= 1.5 ? 'acceptable' : value >= 1 ? 'attention' : value >= 0.5 ? 'bad' : 'critical'
+const demandLabelForMap = (value: number) => ({ competitive: 'Competitivo', acceptable: 'Aceitável', attention: 'Atenção', bad: 'Ruim', critical: 'Crítico' })[demandStatusForMap(value)]
+const demandDescriptionForMap = (value: number | undefined) => value === undefined ? 'Sem vagas no recorte' : `Demanda: ${value.toFixed(2).replace('.', ',')} pagos/vaga · ${demandLabelForMap(value)}`
 const rgba = (value: string, alpha: number) => {
   const parsed = d3.color(value)
   if (!parsed) return value
@@ -99,7 +102,7 @@ function buildMapTheme(container: HTMLDivElement): MapTheme {
     regionalStroke: rgba(cpsBlueDark, 0.48),
     regionalHoverStroke: rgba(cpsCyanLight, 0.94),
     regionalPalette,
-    statusPalette: { comfortable: cpsSuccess, attention: cpsAttention, low: cpsError },
+    statusPalette: { competitive: cpsSuccess, acceptable: cpsCyan, attention: cpsAttention, bad: '#E57373', critical: '#8B0000' },
   }
 }
 
@@ -130,7 +133,7 @@ function separateOverlappingPoints(points: UnitPoint[], minimumDistance = 5) {
   })
 }
 
-export default function D3GeographicMap({ etecs, selected, visible, selectedRegionals, selectedMunicipalities, focusedRegional, focusedMunicipality, resetKey, regionalStatuses, regionalLowDemandRates, municipalityLowDemandRates, regionalLocationStatusCounts, municipalityLocationStatusCounts, colorByStatus, mapStatusKey, onSelect, onGeographicSelect, onRegionalCitiesSelect, onGeographicClear }: MapProps) {
+export default function D3GeographicMap({ etecs, selected, visible, selectedRegionals, selectedMunicipalities, focusedRegional, focusedMunicipality, resetKey, regionalDemands, municipalityDemands, regionalLocationStatusCounts, municipalityLocationStatusCounts, colorByStatus, mapStatusKey, onSelect, onGeographicSelect, onRegionalCitiesSelect, onGeographicClear }: MapProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const callbacks = useRef({ onSelect, onGeographicSelect, onRegionalCitiesSelect, onGeographicClear })
   const resetMap = useRef<null | (() => void)>(null)
@@ -189,15 +192,7 @@ export default function D3GeographicMap({ etecs, selected, visible, selectedRegi
     const width = Math.max(containerSize.width || container.clientWidth, 320)
     const height = Math.max(containerSize.height || container.clientHeight, 220)
     const theme = buildMapTheme(container)
-    const heatColorFor = (rate: number | undefined) => {
-      if (rate === undefined) return theme.municipalNeutralStroke
-      const normalized = Math.max(0, Math.min(1, rate))
-      const vivid = normalized <= .5
-        ? mixColor(theme.statusPalette.comfortable, theme.statusPalette.attention, normalized / .5)
-        : mixColor(theme.statusPalette.attention, theme.statusPalette.low, (normalized - .5) / .5)
-      // Keep the map soft enough for labels while preserving a continuous, visible scale.
-      return mixColor(vivid, theme.stateFill, .22)
-    }
+    const heatColorFor = (demand: number | undefined) => demand === undefined ? theme.municipalNeutralStroke : theme.statusPalette[demandStatusForMap(demand)]
     // Keep a compact label zone so the state itself uses the available map height.
     const stateBottomPadding = Math.max(20, Math.round(height * 0.07))
     const projection = d3.geoMercator().fitExtent([[20, 8], [width - 20, height - stateBottomPadding]], REGIONAIS as d3.ExtendedFeatureCollection)
@@ -234,7 +229,7 @@ export default function D3GeographicMap({ etecs, selected, visible, selectedRegi
     const hideTip = () => tooltip.style('display', 'none')
     const showTip = (event: MouseEvent, title: string, subtitle: string, units: EtecPoint[], action: string, isLocalOffer = false, locationStatuses?: OfferLocationStatusCounts) => {
       const percentage = (value: number) => locationStatuses?.total ? `${Math.round(value / locationStatuses.total * 100)}%` : '0%'
-      const statusDetails = locationStatuses ? `<div class="ared-tip-statuses"><div><span class="status-comfortable">Confortável</span><b>${locationStatuses.comfortable} (${percentage(locationStatuses.comfortable)})</b></div><div><span class="status-attention">Atenção</span><b>${locationStatuses.attention} (${percentage(locationStatuses.attention)})</b></div><div><span class="status-low">Baixa demanda</span><b>${locationStatuses.low} (${percentage(locationStatuses.low)})</b></div></div>` : ''
+      const statusDetails = locationStatuses ? `<div class="ared-tip-statuses"><div><span class="status-competitive">Competitivo</span><b>${locationStatuses.competitive} (${percentage(locationStatuses.competitive)})</b></div><div><span class="status-acceptable">Aceitável</span><b>${locationStatuses.acceptable} (${percentage(locationStatuses.acceptable)})</b></div><div><span class="status-attention">Atenção</span><b>${locationStatuses.attention} (${percentage(locationStatuses.attention)})</b></div><div><span class="status-bad">Ruim</span><b>${locationStatuses.bad} (${percentage(locationStatuses.bad)})</b></div><div><span class="status-critical">Crítico</span><b>${locationStatuses.critical} (${percentage(locationStatuses.critical)})</b></div></div>` : ''
       const total = locationStatuses?.total ?? units.length
       const totalLabel = locationStatuses ? (locationStatuses.label ?? 'Locais de oferta') : isLocalOffer ? (units.length === 1 ? 'Local de oferta' : 'Locais de oferta') : 'Etecs'
       const snapshotDetail = locationStatuses ? '' : `<div class="ared-tip-detail">${total ? 'Dados do snapshot disponíveis' : 'Sem dados no recorte'}</div>`
@@ -362,9 +357,9 @@ export default function D3GeographicMap({ etecs, selected, visible, selectedRegi
       }
       municipalityLayer.selectAll('*').remove()
       municipalityLayer.attr('transform', null).attr('opacity', 0)
-      const municipalityColorFor = (municipality: string) => colorByStatus ? heatColorFor(municipalityLowDemandRates[normalize(municipality)]) : color
+      const municipalityColorFor = (municipality: string) => colorByStatus ? heatColorFor(municipalityDemands[normalize(municipality)]) : color
       const isSelectedMunicipality = (municipality: string) => !selectedMunicipalities.length || selectedMunicipalities.some((item) => normalize(item) === normalize(municipality))
-      const municipalityBaseFill = (municipality: string) => isSelectedMunicipality(municipality) ? rgba(municipalityColorFor(municipality), 0.56) : theme.municipalNeutralFill
+      const municipalityBaseFill = (municipality: string) => isSelectedMunicipality(municipality) ? rgba(municipalityColorFor(municipality), colorByStatus ? 0.72 : 0.56) : theme.municipalNeutralFill
       const municipalityHoverFill = (municipality: string) => isSelectedMunicipality(municipality) ? rgba(brightenColor(municipalityColorFor(municipality), 0.45), 0.78) : mixColor(theme.municipalNeutralFill, theme.stateFill, 0.32)
       const municipalityNeutralFill = colorByStatus ? mixColor(theme.municipalNeutralFill, theme.municipalNeutralStroke, 0.38) : theme.municipalNeutralFill
       const paths = municipalityLayer.selectAll<SVGPathElement, Feature>('path').data(data.features).join('path').attr('class', 'ared-mun-path').attr('d', (item) => municipalPath(item as d3.GeoPermissibleObjects) ?? '').attr('fill', (item) => unitsForMunicipality(activeEtecs, String(item.properties.name ?? '')).length ? municipalityBaseFill(String(item.properties.name ?? '')) : municipalityNeutralFill).attr('stroke', (item) => unitsForMunicipality(activeEtecs, String(item.properties.name ?? '')).length && isSelectedMunicipality(String(item.properties.name ?? '')) ? rgba(municipalityColorFor(String(item.properties.name ?? '')), 0.45) : theme.municipalNeutralStroke).style('cursor', (item) => isSelectedMunicipality(String(item.properties.name ?? '')) ? 'pointer' : 'default').attr('opacity', 0)
@@ -373,7 +368,7 @@ export default function D3GeographicMap({ etecs, selected, visible, selectedRegi
         if (activeMunicipality === municipality || !isSelectedMunicipality(municipality)) return
         const hasUnits = unitsForMunicipality(activeEtecs, municipality).length > 0
         d3.select(this).attr('fill', hasUnits ? municipalityHoverFill(municipality) : municipalityNeutralFill).attr('stroke', hasUnits ? municipalityColorFor(municipality) : theme.municipalNeutralStroke)
-      }).on('mousemove', (event, item) => { const municipality = String(item.properties.name ?? ''); if (!municipalityTooltipsEnabled || !isSelectedMunicipality(municipality)) { hideTip(); return }; const units = unitsForMunicipality(activeEtecs, municipality); showTip(event, municipality, '', units, '', false, municipalityLocationStatusCounts[normalize(municipality)]) }).on('mouseleave', function (_event, item) {
+      }).on('mousemove', (event, item) => { const municipality = String(item.properties.name ?? ''); if (!municipalityTooltipsEnabled || !isSelectedMunicipality(municipality)) { hideTip(); return }; const units = unitsForMunicipality(activeEtecs, municipality); showTip(event, municipality, colorByStatus ? demandDescriptionForMap(municipalityDemands[normalize(municipality)]) : '', units, '', false, municipalityLocationStatusCounts[normalize(municipality)]) }).on('mouseleave', function (_event, item) {
         municipalityTooltipsEnabled = true
         const municipality = String(item.properties.name ?? '')
         if (activeMunicipality !== municipality) {
@@ -443,12 +438,11 @@ export default function D3GeographicMap({ etecs, selected, visible, selectedRegi
 
     REGIONAIS.features.forEach((feature) => {
       const regional = String(feature.properties.regional ?? '')
-      const status = regionalStatuses[regional] ?? 'unavailable'
-      const lowDemandRate = regionalLowDemandRates[regional]
+      const demand = regionalDemands[regional]
       const isHighlighted = selectedRegionals.length < 2 || selectedRegionals.includes(regional)
       const canShowRegionalTooltip = !selectedRegionals.length || selectedRegionals.includes(regional)
-      const color = colorByStatus ? heatColorFor(lowDemandRate) : (theme.regionalPalette[regional] ?? String(feature.properties.cor ?? '#005C6D'))
-      const fill = isHighlighted ? mixColor(color, theme.stateFill, showMunicipalityOutlines ? 0.8 : 0.42) : theme.municipalNeutralFill
+      const color = colorByStatus ? heatColorFor(demand) : (theme.regionalPalette[regional] ?? String(feature.properties.cor ?? '#005C6D'))
+      const fill = isHighlighted ? mixColor(color, theme.stateFill, colorByStatus ? 0.18 : showMunicipalityOutlines ? 0.8 : 0.42) : theme.municipalNeutralFill
       const hoverFill = isHighlighted ? rgba(brightenColor(color, 0.38), 0.98) : mixColor(theme.municipalNeutralFill, theme.stateFill, 0.32)
       const labelIsLight = hasDarkBackground(color)
       const stroke = isHighlighted ? theme.regionalStroke : theme.municipalNeutralStroke
@@ -456,7 +450,7 @@ export default function D3GeographicMap({ etecs, selected, visible, selectedRegi
         if (activeRegional || !canShowRegionalTooltip) return
         regionalLayer.selectAll<SVGPathElement, Feature>('.ared-reg-path').transition().duration(180).attr('opacity', (item) => String(item.properties.regional) === regional ? 1 : 0.62)
         d3.select(this).attr('fill', hoverFill).attr('stroke', theme.regionalHoverStroke).attr('stroke-width', 1.8)
-      }).on('mousemove', (event) => { if (activeRegional || !regionalTooltipsEnabled || !canShowRegionalTooltip) { hideTip(); return }; showTip(event, regional, colorByStatus ? (lowDemandRate === undefined ? 'Sem vagas no recorte' : `Baixa demanda: ${Math.round(lowDemandRate * 100)}% das ofertas`) : '', regionalUnits(regional), '', false, regionalLocationStatusCounts[regional]) }).on('mouseleave', function () {
+      }).on('mousemove', (event) => { if (activeRegional || !regionalTooltipsEnabled || !canShowRegionalTooltip) { hideTip(); return }; showTip(event, regional, colorByStatus ? demandDescriptionForMap(demand) : '', regionalUnits(regional), '', false, regionalLocationStatusCounts[regional]) }).on('mouseleave', function () {
         regionalTooltipsEnabled = true
         if (!activeRegional) {
           regionalLayer.selectAll<SVGPathElement, Feature>('.ared-reg-path').transition().duration(180).attr('opacity', 1)
