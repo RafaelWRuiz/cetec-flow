@@ -492,13 +492,15 @@ footer {
   .course-period-tabs { justify-content: flex-start; overflow-x: auto; padding-bottom: 2px; }
 }
 .analysis-regional-table { flex: 1; overflow: auto; }
-.analysis-regional-table .regional-head { padding: 0; }
+.analysis-regional-table .regional-head, .analysis-regional-table .regional-line, .analysis-regional-table .regional-total { grid-template-columns: 2fr 1fr 1fr 1.45fr 1fr 1.25fr; min-width: 560px; }
+.analysis-regional-table .regional-head { padding: 0 13px; }
 .analysis-regional-table .regional-sort { display: flex; align-items: center; justify-content: center; gap: 3px; min-width: 0; border: 0; padding: 9px 3px; color: inherit; background: transparent; font: inherit; font-weight: inherit; text-transform: inherit; }
 .analysis-regional-table .regional-sort:hover, .analysis-regional-table .regional-sort.active { color: var(--cps-blue); }
 .analysis-regional-table .regional-sort:focus-visible { position: relative; z-index: 1; outline: 2px solid var(--cps-cyan); outline-offset: -2px; }
 .analysis-regional-table .regional-sort-arrow { flex: 0 0 auto; color: var(--cps-blue); font-size: 7px; font-style: normal; line-height: 1; }
 .analysis-regional-table .regional-line > strong, .analysis-regional-table .regional-total > strong { text-align: center; }
 .analysis-regional-table .regional-line > span, .analysis-regional-table .regional-total > span { text-align: center; }
+.analysis-regional-table .performance-conversion-cell { display: flex; align-items: baseline; justify-content: center; gap: 6px; white-space: nowrap; }
 .analysis-regional-table .performance-situation { font-weight: 700; }
 .analysis-regional-table .status-comfortable { color: var(--cps-success); }
 .analysis-regional-table .status-attention { color: var(--cps-attention); }
@@ -509,6 +511,60 @@ footer {
 .analysis-regional-table .regional-line.is-drilldown:hover { background: var(--cps-hover); }
 .analysis-regional-table .regional-line.is-drilldown:focus-visible { position: relative; z-index: 1; outline: 2px solid var(--cps-blue); outline-offset: -2px; }
 .analysis-regional-table .regional-line:disabled { opacity: 1; cursor: default; }
+.analysis-rank { display: flex; flex: 1; flex-direction: column; gap: 10px; min-width: 0; min-height: 0; padding: 10px 12px; color: var(--cps-text); }
+.analysis-rank-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 14px; }
+.analysis-rank-search { flex: 1 1 100%; min-width: 170px; max-width: none; }
+.analysis-rank-search input { width: 100%; min-height: 34px; box-sizing: border-box; border: 1px solid var(--cps-border); border-radius: 4px; padding: 6px 9px; color: var(--cps-text); background: var(--cps-surface); font: inherit; font-size: 11px; }
+.analysis-rank-search input:focus-visible { outline: 2px solid var(--cps-blue); outline-offset: 1px; }
+.analysis-rank-search input::placeholder { color: var(--cps-text-secondary); }
+.analysis-rank-toolbar .analysis-rank-count { color: var(--cps-text-secondary); font-size: 10px; white-space: nowrap; }
+.analysis-rank-toolbar button { display: inline-flex; align-items: center; gap: 4px; min-height: 29px; border: 1px solid var(--cps-border); border-radius: 4px; padding: 3px 7px; color: var(--cps-blue-dark); background: var(--cps-surface); font: inherit; font-size: 10px; font-weight: 700; white-space: nowrap; cursor: pointer; }
+.analysis-rank-toolbar button:hover { border-color: var(--cps-blue); background: var(--cps-hover); }
+.analysis-rank-toolbar button:focus-visible, .analysis-rank-scroll:focus-visible { outline: 2px solid var(--cps-blue); outline-offset: 2px; }
+.analysis-rank-toolbar button > span { font-size: 13px; line-height: 1; }
+.analysis-rank-scroll { flex: 1; min-width: 0; min-height: 0; overflow: auto; border: 1px solid var(--cps-border); border-radius: 4px; }
+.analysis-rank-table { width: 100%; border-collapse: separate; border-spacing: 0; color: var(--cps-text-secondary); font-size: 11px; font-variant-numeric: tabular-nums; }
+.analysis-rank-table th, .analysis-rank-table td { padding: 8px 9px; border-bottom: 1px solid var(--cps-border); text-align: center; white-space: nowrap; }
+.analysis-rank-table th { position: sticky; top: 0; z-index: 1; color: var(--cps-blue-dark); background: var(--cps-hover); font-size: 9px; text-transform: uppercase; }
+.analysis-rank-table th:first-child { width: 34px; padding-inline: 4px; }
+.analysis-rank-sort { display: grid; place-items: center; width: 26px; height: 24px; margin: auto; border: 1px solid transparent; border-radius: 4px; color: var(--cps-blue-dark); background: transparent; font: inherit; font-size: 14px; line-height: 1; cursor: pointer; }
+.analysis-rank-sort:hover { border-color: var(--cps-border); color: var(--cps-blue); background: var(--cps-surface); }
+.analysis-rank-sort:focus-visible { outline: 2px solid var(--cps-blue); outline-offset: 1px; }
+.analysis-rank-table th:nth-child(2), .analysis-rank-table th:nth-child(3), .analysis-rank-table td:nth-child(2), .analysis-rank-table td:nth-child(3) { text-align: left; white-space: normal; }
+.analysis-rank-table td:nth-child(2) strong, .analysis-rank-table td:nth-child(3) strong, .analysis-rank-table td:nth-child(2) > span, .analysis-rank-table td:nth-child(3) > span { display: block; }
+.analysis-rank-table td:nth-child(2) strong, .analysis-rank-table td:nth-child(3) strong { color: var(--cps-blue-dark); font-weight: 650; }
+.analysis-rank-table td:nth-child(2) > span, .analysis-rank-table td:nth-child(3) > span { margin-top: 2px; color: var(--cps-text-secondary); font-size: 9px; }
+.analysis-rank-table tbody tr:hover { background: var(--cps-hover); }
+.analysis-rank-table tbody tr:not(.analysis-rank-spacer) { height: 68px; }
+.analysis-rank-table tbody tr:not(.analysis-rank-spacer) td { box-sizing: border-box; height: 68px; overflow: hidden; }
+.analysis-rank-table td:nth-child(2) strong, .analysis-rank-table td:nth-child(3) strong { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.analysis-rank-table td:nth-child(2) > span, .analysis-rank-table td:nth-child(3) > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.analysis-rank-table tbody tr.analysis-rank-spacer, .analysis-rank-table tbody tr.analysis-rank-spacer:hover { background: transparent; }
+.analysis-rank-table tbody tr.analysis-rank-spacer td { height: auto; padding: 0; border: 0; }
+.analysis-rank-position { width: 34px; color: var(--cps-text-secondary); }
+.analysis-rank-demand strong, .analysis-rank-demand > span { display: block; }
+.analysis-rank-demand strong { font-size: 12px; }
+.analysis-rank-demand.status-competitive strong { color: var(--cps-success); }
+.analysis-rank-demand.status-acceptable strong { color: var(--cps-cyan); }
+.analysis-rank-demand.status-attention strong { color: var(--cps-attention); }
+.analysis-rank-demand.status-bad strong { color: var(--cps-coral); }
+.analysis-rank-demand.status-critical strong { color: var(--cps-error); }
+.analysis-rank-demand > span { margin-top: 2px; color: var(--cps-text-secondary); font-size: 9px; }
+.analysis-rank-demand > .analysis-rank-detail { display: none; }
+.analysis-rank-empty { display: grid; flex: 1; place-items: center; margin: 0; color: var(--cps-text-secondary); font-size: 12px; text-align: center; }
+@media (max-width: 620px) {
+  .analysis-rank { padding: 8px; }
+  .analysis-rank-search { flex: 1 1 100%; max-width: none; }
+  .analysis-rank-search input { min-height: 40px; font-size: 12px; }
+  .analysis-rank-toolbar button { min-height: 40px; }
+  .analysis-rank-table { table-layout: fixed; font-size: 10px; }
+  .analysis-rank-table th, .analysis-rank-table td { padding: 8px 5px; }
+  .analysis-rank-table th:first-child, .analysis-rank-table td:first-child { width: 28px; }
+  .analysis-rank-table th:nth-child(2), .analysis-rank-table td:nth-child(2) { width: 36%; }
+  .analysis-rank-table th:nth-child(3), .analysis-rank-table td:nth-child(3) { width: 36%; }
+  .analysis-rank-table th:nth-child(4), .analysis-rank-table td:nth-child(4), .analysis-rank-table th:nth-child(5), .analysis-rank-table td:nth-child(5) { display: none; }
+  .analysis-rank-demand > .analysis-rank-detail { display: block; white-space: normal; }
+}
 
 @media (min-width: 1200px) {
   .content { height: auto; padding: 8px 0 calc(18px + var(--app-footer-height)); }
