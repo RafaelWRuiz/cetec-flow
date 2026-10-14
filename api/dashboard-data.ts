@@ -1,8 +1,9 @@
 import { createClient } from '@supabase/supabase-js'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { asWebRequest, sendWebResponse } from './http.mjs'
-import { EDITION, loadPreparedDashboard, type ImportRecord } from '../server/dashboardCache.ts'
-import { historyGroups, historyRecords, loadHistoryPack } from '../server/historyCache.ts'
+import { EDITION, loadPreparedDashboard } from '../server/dashboardCache.mjs'
+import { historyGroups, historyRecords, loadHistoryPack } from '../server/historyCache.mjs'
+import type { ImportRecord } from '../server/dashboardCache.ts'
 
 const json = (body: Record<string, unknown>, status = 200, versioned = false) => new Response(JSON.stringify(body), { status, headers: {
   'cache-control': versioned ? 'public, max-age=3600, s-maxage=86400' : 'no-store',

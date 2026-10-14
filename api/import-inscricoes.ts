@@ -3,8 +3,8 @@ import { createClient } from '@supabase/supabase-js'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { parseInscricoes, parseInscricoesXlsx } from '../scripts/parse-inscricoes.mjs'
 import { asWebRequest, sendWebResponse } from './http.mjs'
-import { loadCourseAxes, prepareDashboard, savePreparedDashboard } from '../server/dashboardCache.ts'
-import { savePreparedHistory } from '../server/historyCache.ts'
+import { loadCourseAxes, prepareDashboard, savePreparedDashboard } from '../server/dashboardCache.mjs'
+import { savePreparedHistory } from '../server/historyCache.mjs'
 
 const MAX_FILE_BYTES = 5 * 1024 * 1024
 const BUCKET = 'cetec-flow-imports'

@@ -2,7 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import handler from '../api/dashboard-data.ts'
 import importHandler from '../api/import-inscricoes.ts'
-import { prepareDashboard } from '../server/dashboardCache.ts'
+import { prepareDashboard } from '../server/dashboardCache.mjs'
 import { compactHistory } from '../src/lib/compactHistory.ts'
 
 test('bloco pronto entrega várias datas com uma leitura de Storage e sem consultar ofertas', async () => fakeEnvironment('history-pack', async () => {
