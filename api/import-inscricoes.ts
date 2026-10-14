@@ -3,6 +3,8 @@ import { createClient } from '@supabase/supabase-js'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { parseInscricoes, parseInscricoesXlsx } from '../scripts/parse-inscricoes.mjs'
 import { asWebRequest, sendWebResponse } from './http.mjs'
+import { loadCourseAxes, prepareDashboard, savePreparedDashboard } from '../server/dashboardCache.ts'
+import { savePreparedHistory } from '../server/historyCache.ts'
 
 const MAX_FILE_BYTES = 5 * 1024 * 1024
 const BUCKET = 'cetec-flow-imports'
@@ -21,6 +23,8 @@ type ImportRow = {
   vacancies: number
   paid: number
   unpaid: number
+  second_option_paid: number | null
+  second_option_unpaid: number | null
   is_trainee: boolean
 }
 
@@ -147,6 +151,8 @@ async function handle(request: Request) {
       vacancies: offer.vagas,
       paid: offer.pagos,
       unpaid: offer.nao_pagos,
+      second_option_paid: offer.segunda_opcao_pagos,
+      second_option_unpaid: offer.segunda_opcao_nao_pagos,
       is_trainee: offer.is_treineiro,
     }
   })
@@ -156,7 +162,13 @@ async function handle(request: Request) {
       const { error } = await supabase.from('cetec_enrollment_snapshots').insert(batch)
       if (error) throw error
     }
-    await supabase.from('cetec_imports').update({ is_active: false }).eq('edition', snapshot.metadata.edicao).eq('is_active', true)
+    const axes = await loadCourseAxes(supabase)
+    const record = { id: importId!, edition: snapshot.metadata.edicao, source_file_name: fileName, reference_at: snapshot.metadata.data_referencia }
+    const prepared = prepareDashboard(record, rows, axes)
+    await savePreparedDashboard(supabase, prepared)
+    await savePreparedHistory(supabase, record, prepared, url)
+    const { error: deactivateError } = await supabase.from('cetec_imports').update({ is_active: false }).eq('edition', snapshot.metadata.edicao).eq('is_active', true)
+    if (deactivateError) throw deactivateError
     const { error: activateError } = await supabase.from('cetec_imports').update({ is_active: true, status: 'completed' }).eq('id', importId!)
     if (activateError) throw activateError
   } catch (error) {

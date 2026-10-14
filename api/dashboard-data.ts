@@ -1,60 +1,43 @@
-import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+import { createClient } from '@supabase/supabase-js'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { asWebRequest, sendWebResponse } from './http.mjs'
+import { EDITION, loadPreparedDashboard, type ImportRecord } from '../server/dashboardCache.ts'
+import { historyGroups, historyRecords, loadHistoryPack } from '../server/historyCache.ts'
 
-type ImportRecord = { id: string; edition: string; source_file_name: string; reference_at: string }
-type SnapshotRow = { local_code: string; municipality: string | null; etec_name: string | null; regional: string | null; course: string; period: string; vacancies: number; paid: number; unpaid: number; is_trainee: boolean }
-type CourseAxisRow = { course_key: string; technological_axis: string }
-const EDITION = 'Vestibulinho 2027.1'
-
-const normalizeCourseKey = (value: string) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim()
-  .replace(/^ensino medio com habilitacao profissional de tecnico em\s+/, '')
-  .replace(/^tecnico em\s+/, '')
-  .replace(/\s+-\s+(?:m[- ]?tec|mnp|ead|20% online|integrado ao ensino medio|novotec)\b.*$/, '')
-  .replace(/[^a-z0-9]+/g, ' ').trim()
-
-const json = (body: Record<string, unknown>, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'cache-control': 'no-store', 'content-type': 'application/json; charset=utf-8' } })
-
-async function loadRows(supabase: SupabaseClient, importId: string) {
-  const rows: SnapshotRow[] = []
-  for (let from = 0; ; from += 1000) {
-    // A unique, stable order prevents overlaps and omissions between pages.
-    const { data, error } = await supabase.from('cetec_enrollment_snapshots').select('local_code, municipality, etec_name, regional, course, period, vacancies, paid, unpaid, is_trainee').eq('import_id', importId).order('id', { ascending: true }).range(from, from + 999)
-    if (error) throw error
-    rows.push(...(data ?? []))
-    if (!data || data.length < 1000) return rows
-  }
-}
-
-async function loadCourseAxes(supabase: SupabaseClient) {
-  const { data, error } = await supabase.from('cetec_course_axes').select('course_key, technological_axis').returns<CourseAxisRow[]>()
-  if (error) return new Map<string, string>()
-  return new Map((data ?? []).map((item) => [item.course_key, item.technological_axis]))
-}
+const json = (body: Record<string, unknown>, status = 200, versioned = false) => new Response(JSON.stringify(body), { status, headers: {
+  'cache-control': versioned ? 'public, max-age=3600, s-maxage=86400' : 'no-store',
+  'content-type': 'application/json; charset=utf-8',
+} })
 
 async function handle(request: Request) {
   if (request.method !== 'GET') return json({ error: 'Método não permitido.' }, 405)
   const url = process.env.SUPABASE_URL
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
   if (!url || !serviceRoleKey) return json({ snapshots: null })
-
+  const params = new URL(request.url).searchParams
+  const historyFor = params.get('historyFor')
+  const requestedId = historyFor ?? params.get('importId')
+  const part = Number(params.get('part'))
+  if (historyFor && (!params.has('part') || !Number.isInteger(part) || part < 0)) return json({ error: 'Bloco inválido.' }, 400)
+  if (requestedId && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(requestedId)) return json({ error: 'Importação inválida.' }, 400)
   const supabase = createClient(url, serviceRoleKey, { auth: { autoRefreshToken: false, persistSession: false } })
-  const { data: active, error: activeError } = await supabase.from('cetec_imports').select('id, edition, source_file_name, reference_at').eq('edition', EDITION).eq('is_active', true).eq('status', 'completed').order('reference_at', { ascending: false }).limit(1).maybeSingle<ImportRecord>()
+  const columns = 'id, edition, source_file_name, reference_at'
+  let query = supabase.from('cetec_imports').select(columns).eq('edition', EDITION).eq('status', 'completed')
+  query = requestedId ? query.eq('id', requestedId) : query.eq('is_active', true)
+  const { data: active, error: activeError } = await query.order('reference_at', { ascending: false }).limit(1).maybeSingle<ImportRecord>()
   if (activeError) return json({ error: 'Não foi possível carregar a versão ativa.' }, 500)
-  if (!active) return json({ snapshots: null })
-
-  const { data: imports, error: importsError } = await supabase.from('cetec_imports').select('id, edition, source_file_name, reference_at').eq('edition', active.edition).eq('status', 'completed').order('reference_at', { ascending: true }).returns<ImportRecord[]>()
-  if (importsError) return json({ error: 'Não foi possível carregar o histórico.' }, 500)
-
+  if (!active) return requestedId ? json({ error: 'Importação não encontrada.' }, 404) : json({ snapshots: null })
   try {
-    const [loaded, courseAxes] = await Promise.all([
-      Promise.all((imports ?? []).map(async (item) => ({ item, rows: await loadRows(supabase, item.id) }))),
-      loadCourseAxes(supabase),
-    ])
-    const current = loaded.at(-1)!
-    const etecs = [...new Map(current.rows.map((row) => [row.local_code, { name: row.local_code, label: `${row.etec_name ?? row.local_code} (${row.local_code})`, city: row.municipality ?? '', municipality: row.municipality ?? '', regional: row.regional ?? '', x: 0, y: 0 }])).values()]
-    const snapshots = loaded.map(({ item, rows }) => ({ referenceAt: item.reference_at, enrollments: rows.map((row) => ({ etec: row.local_code, regional: row.regional ?? '', modality: 'Não informado no arquivo', course: row.course, axis: courseAxes.get(normalizeCourseKey(row.course)) ?? '', period: row.period, paid: row.paid, unpaid: row.unpaid, vacancies: row.vacancies, demand: row.vacancies ? (row.paid + row.unpaid) / row.vacancies : 0, target: 0, daily: [], isTrainee: row.is_trainee })) }))
-    return json({ sourceMetadata: { edicao: active.edition, arquivo_origem: active.source_file_name, data_referencia: active.reference_at }, etecs, snapshots })
+    if (historyFor) {
+      const groups = historyGroups(await historyRecords(supabase, active))
+      if (!groups[part]) return json({ error: 'Bloco não encontrado.' }, 404)
+      return json({ compactHistory: await loadHistoryPack(supabase, groups[part], url) }, 200, true)
+    }
+    const preparedPromise = loadPreparedDashboard(supabase, active, url)
+    if (requestedId) return json({ ...await preparedPromise }, 200, true)
+    const historyPromise = historyRecords(supabase, active).then(data => ({ data, error: false }), () => ({ data: [] as ImportRecord[], error: true }))
+    const [prepared, historyResult] = await Promise.all([preparedPromise, historyPromise])
+    return json({ ...prepared, historyPacks: historyGroups(historyResult.data).length, history: historyResult.data.map(item => ({ id: item.id, referenceAt: new Date(item.reference_at).toISOString() })), historyError: historyResult.error ? 'Não foi possível consultar o histórico.' : null })
   } catch {
     return json({ error: 'Não foi possível carregar os dados da versão ativa.' }, 500)
   }

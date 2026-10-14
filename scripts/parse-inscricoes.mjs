@@ -28,7 +28,7 @@ const parseLocationTitle = (title) => {
 }
 
 const createOffer = (codigoLocal, values) => {
-  const [curso, periodo, vagas, pagos, naoPagos, totalInscritos, demanda] = values
+  const [curso, periodo, vagas, pagos, naoPagos, totalInscritos, demanda, segundaPagos, segundaNaoPagos] = values
   const vagasNumero = number(vagas); const totalNumero = number(totalInscritos)
   return {
     codigo_local: codigoLocal,
@@ -37,6 +37,8 @@ const createOffer = (codigoLocal, values) => {
     vagas: vagasNumero,
     pagos: number(pagos),
     nao_pagos: number(naoPagos),
+    segunda_opcao_pagos: values.length === 10 ? number(segundaPagos) : null,
+    segunda_opcao_nao_pagos: values.length === 10 ? number(segundaNaoPagos) : null,
     total_inscritos: totalNumero,
     demanda_original: demanda ? number(demanda) : null,
     demanda_calculada: vagasNumero > 0 ? totalNumero / vagasNumero : 0,
@@ -91,7 +93,7 @@ const xlsxRows = (file) => {
   const sharedStrings = [...zipEntry(file, 'xl/sharedStrings.xml').matchAll(/<si\b[^>]*>([\s\S]*?)<\/si>/gi)].map((match) => decodeXml(match[1]))
   const sheet = zipEntry(file, 'xl/worksheets/sheet1.xml')
   return [...sheet.matchAll(/<row\b[^>]*>([\s\S]*?)<\/row>/gi)].map((row) => {
-    const values = Array(7).fill('')
+    const values = Array(10).fill('')
     for (const cell of row[1].matchAll(/<c\b([^>]*)>([\s\S]*?)<\/c>/gi)) {
       const reference = cell[1].match(/\br="([^"]+)"/i)?.[1]
       const column = reference ? columnIndex(reference) : 0
@@ -118,18 +120,20 @@ export function parseInscricoes(html, source = 'source.xls') {
     // The first unit is embedded in the report's nested opening row.
     const section = html.slice(index === 0 ? Math.max(0, match.index - 1000) : match.index, next)
     for (const row of section.matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr>/gi)) {
-      const values = cells(row[1]); if (values.length !== 7 || values[0] === 'Curso') continue
-      const [curso, periodo, vagas, pagos, naoPagos, totalInscritos, demanda] = values
-      if (!curso || !periodo) continue
-      ofertas.push(createOffer(codigoCompleto, [curso, periodo, vagas, pagos, naoPagos, totalInscritos, demanda]))
+      const values = cells(row[1]); if (![7, 10].includes(values.length)) continue
+      const [curso, periodo, vagas] = values
+      if (!curso || !periodo || curso === 'TOTAL' || periodo === 'TOTAL' || !/^\d+$/.test(vagas)) continue
+      ofertas.push(createOffer(codigoCompleto, values))
     }
     if (index === 0) {
       const values = cells(section); const header = values.indexOf('Curso')
-      for (let cursor = header + 7; cursor >= 7 && cursor + 6 < values.length; cursor += 7) {
-        const [curso, periodo, vagas, pagos, naoPagos, totalInscritos, demanda] = values.slice(cursor, cursor + 7)
-        if (!curso || curso === 'TOTAL' || periodo === 'TOTAL' || periodo === 'Treineiro' || !/^\d+$/.test(vagas)) continue
-        if (ofertas.some((offer) => offer.codigo_local === codigoCompleto && offer.curso === curso && offer.periodo === periodo)) continue
-        ofertas.push(createOffer(codigoCompleto, [curso, periodo, vagas, pagos, naoPagos, totalInscritos, demanda]))
+      const width = /2(?:ª|&ordf;|&#170;)\s*opção/i.test(section) ? 10 : 7
+      for (let cursor = header + 3; header >= 0 && cursor + width - 1 < values.length; cursor++) {
+        const [curso, periodo, vagas] = values.slice(cursor, cursor + width)
+        if (!curso || !/[a-zá-ú]/i.test(curso) || curso === 'TOTAL' || periodo === 'TOTAL' || !periodo || !/^\d+$/.test(vagas)) continue
+        if (ofertas.some((offer) => offer.codigo_local === codigoCompleto && offer.curso === curso && offer.periodo === periodo)) { cursor += width - 1; continue }
+        ofertas.push(createOffer(codigoCompleto, values.slice(cursor, cursor + width)))
+        cursor += width - 1
       }
     }
   }
@@ -148,12 +152,13 @@ export async function parseInscricoesXlsx(file, source = 'source.xlsx') {
     const local = parseLocationTitle(section.title)
     locais.push(local)
     const end = sectionStarts[sectionIndex + 1]?.index ?? rows.length
+    const hasSecondOption = rows.slice(section.index + 1, end).some(values => values.some(value => /2ª\s*opção/i.test(value)) || values.slice(7).some(Boolean))
     for (let rowIndex = section.index + 1; rowIndex < end; rowIndex++) {
       const values = rows[rowIndex]
-      const [curso, periodo, vagas, pagos, naoPagos, totalInscritos, demanda] = values
+      const [curso, periodo, vagas] = values
       const isTreineiro = curso === 'Treineiro'
       if (!curso || curso === 'Curso' || curso === 'TOTAL' || periodo === 'TOTAL' || !periodo || (!isTreineiro && !/^\d+(?:[.,]\d+)?$/.test(vagas))) continue
-      ofertas.push(createOffer(local.codigo_completo, [curso, periodo, vagas, pagos, naoPagos, totalInscritos, demanda]))
+      ofertas.push(createOffer(local.codigo_completo, hasSecondOption ? values : values.slice(0, 7)))
     }
   }
 

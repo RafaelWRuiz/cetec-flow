@@ -5,7 +5,7 @@ import type { EtecPoint } from '../data/mockData'
 
 type RegionalStatus = 'competitive' | 'acceptable' | 'attention' | 'bad' | 'critical' | 'unavailable'
 type OfferLocationStatusCounts = { total: number; competitive: number; acceptable: number; attention: number; bad: number; critical: number; label?: 'Locais de oferta' | 'Turmas' }
-type MapProps = { etecs: EtecPoint[]; selected: string; visible: string[]; selectedRegionals: string[]; selectedMunicipalities: string[]; focusedRegional: string; focusedMunicipality: string; resetKey: number; regionalDemands: Record<string, number>; municipalityDemands: Record<string, number>; regionalLocationStatusCounts: Record<string, OfferLocationStatusCounts>; municipalityLocationStatusCounts: Record<string, OfferLocationStatusCounts>; colorByStatus: boolean; mapStatusKey: string; onSelect: (name: string) => void; onGeographicSelect: (label: string, etecs: string[]) => void; onRegionalCitiesSelect: (regional: string) => void; onGeographicClear: () => void }
+type MapProps = { etecs: EtecPoint[]; selected: string; visible: string[]; selectedRegionals: string[]; selectedMunicipalities: string[]; focusedRegional: string; focusedMunicipality: string; resetKey: number; regionalDemands: Record<string, number>; municipalityDemands: Record<string, number>; regionalLocationStatusCounts: Record<string, OfferLocationStatusCounts>; municipalityLocationStatusCounts: Record<string, OfferLocationStatusCounts>; colorByStatus: boolean; mapStatusKey: string; onSelect: (name: string) => void; onGeographicSelect: (label: string, etecs: string[]) => void; onRegionalCitiesSelect: (regional: string) => void; onGeographicClear: () => void; onReady: () => void }
 type Feature = MapFeatureCollection['features'][number]
 type UnitPoint = { etec: EtecPoint; x: number; y: number; originX: number; originY: number }
 const normalize = (value: string) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
@@ -133,7 +133,7 @@ function separateOverlappingPoints(points: UnitPoint[], minimumDistance = 5) {
   })
 }
 
-export default function D3GeographicMap({ etecs, selected, visible, selectedRegionals, selectedMunicipalities, focusedRegional, focusedMunicipality, resetKey, regionalDemands, municipalityDemands, regionalLocationStatusCounts, municipalityLocationStatusCounts, colorByStatus, mapStatusKey, onSelect, onGeographicSelect, onRegionalCitiesSelect, onGeographicClear }: MapProps) {
+export default function D3GeographicMap({ etecs, selected, visible, selectedRegionals, selectedMunicipalities, focusedRegional, focusedMunicipality, resetKey, regionalDemands, municipalityDemands, regionalLocationStatusCounts, municipalityLocationStatusCounts, colorByStatus, mapStatusKey, onSelect, onGeographicSelect, onRegionalCitiesSelect, onGeographicClear, onReady }: MapProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const callbacks = useRef({ onSelect, onGeographicSelect, onRegionalCitiesSelect, onGeographicClear })
   const resetMap = useRef<null | (() => void)>(null)
@@ -479,8 +479,9 @@ export default function D3GeographicMap({ etecs, selected, visible, selectedRegi
     if (showMunicipalityOutlines) selectedMunicipalityLayer.selectAll<SVGPathElement, { regional: string; feature: Feature }>('.ared-selected-mun-outline').data(selectedMunicipalityFeatures).join('path').attr('class', 'ared-selected-mun-outline').attr('d', (item) => path(item.feature as d3.GeoPermissibleObjects) ?? '').attr('fill', 'none').attr('stroke', (item) => theme.regionalPalette[item.regional] ?? theme.municipalSelectedStroke).attr('stroke-width', 2.8).attr('stroke-linejoin', 'round').attr('vector-effect', 'non-scaling-stroke')
     svg.on('click', () => { if (activeRegional) resetZoom() })
     if (focusedRegional) focusRegional.current(focusedRegional)
+    onReady()
     return () => { resetMap.current = null; focusRegional.current = null; focusMunicipality.current = null; container.replaceChildren() }
-  }, [containerSize, resetKey, mapStatusKey, colorByStatus, selectedRegionalKey, selectedMunicipalityKey])
+  }, [containerSize, resetKey, mapStatusKey, colorByStatus, selectedRegionalKey, selectedMunicipalityKey, onReady])
 
   return <div className="ared-map" ref={containerRef} />
 }

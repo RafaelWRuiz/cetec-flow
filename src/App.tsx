@@ -1,9 +1,11 @@
-import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from 'react'
-import D3GeographicMap from './components/D3GeographicMap'
+import { lazy, Suspense, useCallback, useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import EnrollmentReports from './components/EnrollmentReports'
-import { MUN_BY_REGIONAL, REGIONAIS } from './data/aredMapData'
+import RegionalMapPreview from './components/RegionalMapPreview'
+import { REGIONAL_BY_MUNICIPALITY, REGIONAL_NAMES } from './data/regionalLookup'
 import { shortenCourseForWhatsApp } from './data/courseWhatsAppAliases'
 import type { Enrollment, EtecPoint, SnapshotSeries } from './data/mockData'
+import { hasSecondOption, secondOptionSeries } from './lib/secondOption'
+import { fetchDashboard, loadDashboardHistory, readLatestDashboardCache } from './lib/dashboardLoading'
 
 type Filters={regional:string[];city:string[];etec:string[];axis:string[];offerType:string[];course:string[];period:string[]}; type FilterKey=keyof Filters
 type OfferStatus='competitive'|'acceptable'|'attention'|'bad'|'critical'
@@ -11,6 +13,7 @@ type RegionalStatus=OfferStatus|'unavailable'
 type PerformanceSortKey='regional'|'total'|'paid'|'conversion'|'demand'|'situation'
 type AnalysisScope={presential:boolean;ead:boolean;trainees:boolean}
 type DashboardPayload={etecs:EtecPoint[];snapshotSeries:SnapshotSeries[]}
+const D3GeographicMap=lazy(()=>import('./components/D3GeographicMap'))
 const initialFilters:Filters={regional:[],city:[],etec:[],axis:[],offerType:[],course:[],period:[]}; const number=new Intl.NumberFormat('pt-BR')
 const exemptionMetrics: { inscritos_com_isencao: number } | null = null
 const apiBaseUrl=(import.meta.env.VITE_API_BASE_URL??'').replace(/\/$/,'')
@@ -21,7 +24,7 @@ const normalizeName=(value:string)=>value.replace(/&#(\d+);/g,(_,code)=>String.f
 const compactCourseName=(value:string)=>value.replace(/^Ensino Médio com Habilitação Profissional de Técnico em\s+/i,'EM Técnico em ').replace(/^Ensino Médio com Habilitação Profissional\s+/i,'EM Profissional ')
 const chartCourseName=(value:string)=>compactCourseName(value).replace(/Técnico em\s+/i,'')
 const formatEtecLabel=(etec:EtecPoint)=>{const code=etec.name.split('.')[0].replace(/^E0*/i,'').padStart(3,'0');const name=etec.label.replace(/\s*\([^)]*\)\s*$/,'').replace(/^Etec\s+/i,'');return `${code} - ${name}`}
-const mapRegionalByMunicipality=new Map(Object.entries(MUN_BY_REGIONAL).flatMap(([regional,data])=>data.features.map(feature=>[normalizeName(String(feature.properties.name??'')),regional])))
+const mapRegionalByMunicipality=new Map(Object.entries(REGIONAL_BY_MUNICIPALITY))
 const mapRegionalFallbackByMunicipality=new Map([
  ['campinas','Campinas Sul'],
  ['embu das artes','Grande São Paulo Sul/Baixada Santista'],
@@ -35,7 +38,7 @@ const offerTypeOrder=['M-Tec','M-Tec-N','M-Tec AMS','M-Tec-N AMS','M-Tec PI','M-
 type HistoryPoint={referenceAt:string;total:number;paid:number;unpaid:number;trainee:number;regular:number;vacancies:number}; type ChartData=Enrollment[]&{history?:HistoryPoint[]}
 type CoursePeriod='all'|'morning'|'afternoon'|'night'
 type CourseRow={course:string;paid:number;unpaid:number;vacancies:number}
-type CourseChartRow=CourseRow&{offerCount:number;period:string}
+type CourseChartRow=CourseRow&{offerCount:number;period:string;secondOptionPaid:number;secondOptionUnpaid:number}
 const demandStatusFor=(demand:number):OfferStatus=>demand>=2?'competitive':demand>=1.5?'acceptable':demand>=1?'attention':demand>=.5?'bad':'critical'
 const offerStatusFor=(item:Enrollment):OfferStatus=>demandStatusFor(item.vacancies?item.paid/item.vacancies:0)
 const offerTypeFor=(item:Enrollment)=>{if(item.isTrainee)return 'Treineiro';const source=normalizeName(`${item.course} ${item.period} ${item.modality}`).replace(/\s*[-–]\s*/g,'-');const novotec=/\bnovotec integrado\b/.test(source);const emphasis=/^ensino medio com itinerario formativo\b/.test(source);const mtecn=/\bm-tec-n\b|\bmtec-n\b|\bm-tec\(mtec-n\)\b/.test(source);const mtec=/\bm-tec\b|\bmtec\b/.test(source);const pi=/\bpi\b/.test(source);const ams=/\bams\b/.test(source);const mnp=/\bmnp\b/.test(source);if(novotec)return 'Novotec Integrado';if(emphasis)return 'Ensino Médio com Ênfase';if(mtecn&&ams)return 'M-Tec-N AMS';if(mtecn&&pi)return 'M-Tec-N PI';if(mtecn&&mnp)return 'M-Tec-N MNP';if(mtecn)return 'M-Tec-N';if(mtec&&ams&&mnp)return 'M-Tec AMS MNP';if(mtec&&pi&&ams)return 'M-Tec PI AMS';if(mtec&&pi)return 'M-Tec PI';if(mtec&&ams)return 'M-Tec AMS';if(mtec&&mnp)return 'M-Tec MNP';if(mtec)return 'M-Tec';if(mnp)return 'MNP';if(/^especializacao\b/.test(source))return 'Especialização';if(/\bEAD\b/i.test(item.course)||normalizeName(item.period).includes('ead'))return 'EAD';return 'Técnico'}
@@ -49,14 +52,15 @@ function ActionIcon({name}:{name:'copy'|'import'}){
  if(name==='copy')return <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="7" width="11" height="13" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h2"/></svg>
  return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V4"/><path d="m8 8 4-4 4 4"/><path d="M5 15v4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-4"/></svg>
 }
-function CourseRowTrack({paid,unpaid,demand,paidWidth,totalWidth,children}:{paid:number;unpaid:number;demand:number;paidWidth:number;totalWidth:number;children:ReactNode}){
+function CourseRowTrack({paid,unpaid,secondOptionTotal,demand,paidWidth,totalWidth,children}:{paid:number;unpaid:number;secondOptionTotal:number;demand:number;paidWidth:number;totalWidth:number;children:ReactNode}){
  const trackRef=useRef<HTMLSpanElement>(null); const [width,setWidth]=useState(0)
  useEffect(()=>{const track=trackRef.current;if(!track)return undefined;const update=()=>setWidth(track.clientWidth);const observer=new ResizeObserver(update);observer.observe(track);update();return()=>observer.disconnect()},[])
  const paidLabel=number.format(paid); const unpaidLabel=number.format(unpaid); const demandLabel=`${demand.toFixed(1).replace('.',',')}x`; const paidFits=paidWidth/100*width>=Math.max(42,paidLabel.length*7+14); const unpaidFits=(totalWidth-paidWidth)/100*width>=Math.max(42,unpaidLabel.length*7+14); const showInside=paidFits&&unpaidFits
+ const secondOptionLabel=secondOptionTotal?`(${number.format(secondOptionTotal)} 2ª opção)`:''
  return <span className="course-row-track" ref={trackRef}>
 <i className="course-row-paid" style={{width:`${paidWidth}%`}}/>
 <i className="course-row-unpaid" style={{left:`${paidWidth}%`,width:`${Math.max(totalWidth-paidWidth,0)}%`}}/>
-{showInside?<><span className="course-bar-value inside" style={{left:`${paidWidth/2}%`}}>{paidLabel}</span><span className="course-bar-value inside pending" style={{left:`${paidWidth+(totalWidth-paidWidth)/2}%`}}>({unpaidLabel})</span><span className="course-bar-value demand" style={{left:`${totalWidth}%`}}>- {demandLabel}</span></>:<span className="course-bar-value compact" style={{left:`${totalWidth}%`}}><b>{paidLabel}</b><small>({unpaidLabel})</small><em>- {demandLabel}</em></span>}
+{showInside?<><span className="course-bar-value inside" style={{left:`${paidWidth/2}%`}}>{paidLabel}</span><span className="course-bar-value inside pending" style={{left:`${paidWidth+(totalWidth-paidWidth)/2}%`}}>({unpaidLabel})</span><span className="course-bar-value demand" style={{left:`${totalWidth}%`}}>{secondOptionLabel&&<small className="course-second-option-count">{secondOptionLabel}</small>}<em>- {demandLabel}</em></span></>:<span className="course-bar-value compact" style={{left:`${totalWidth}%`}}><b>{paidLabel}</b><small>({unpaidLabel})</small>{secondOptionLabel&&<small className="course-second-option-count">{secondOptionLabel}</small>}<em>- {demandLabel}</em></span>}
 {children}
 </span>
 }
@@ -77,9 +81,36 @@ function SelectFilter({label,value,values,onChange,etecOptions=[]}:{label:string
 </div>}
 </div>
 }
-function TrendChart({data,target}:{data:ChartData;target:number}){
- const svgRef=useRef<SVGSVGElement>(null); const [viewHeight,setViewHeight]=useState(265); const [historyFrequency,setHistoryFrequency]=useState<'auto'|'all'|'weekly'>('auto'); const [chartView,setChartView]=useState<'accumulated'|'dailyPaid'>('accumulated')
- useEffect(()=>{const svg=svgRef.current;if(!svg)return undefined;const update=()=>{if(!svg.clientWidth)return;const next=Math.max(265,Math.round(svg.clientHeight/svg.clientWidth*680));setViewHeight(current=>current===next?current:next)};const observer=new ResizeObserver(update);observer.observe(svg);update();return()=>observer.disconnect()},[])
+const LOADING_PRESENTATION_MS=5000
+function useLoadingPresentation(loading:boolean,cycle:number){
+ const startedAt=useRef(performance.now())
+ const [progress,setProgress]=useState(0)
+ const [visible,setVisible]=useState(loading)
+ useEffect(()=>{
+  if(loading){
+   startedAt.current=performance.now()
+   setProgress(0)
+   setVisible(true)
+   const interval=window.setInterval(()=>{
+    const elapsed=performance.now()-startedAt.current
+    setProgress(Math.min(95,Math.floor(elapsed/LOADING_PRESENTATION_MS*95)))
+   },90)
+   return()=>window.clearInterval(interval)
+  }
+  let hideTimer=0
+  const elapsed=performance.now()-startedAt.current
+  const finishTimer=window.setTimeout(()=>{
+   setProgress(100)
+   hideTimer=window.setTimeout(()=>setVisible(false),280)
+  },Math.max(0,LOADING_PRESENTATION_MS-elapsed))
+  return()=>{window.clearTimeout(finishTimer);window.clearTimeout(hideTimer)}
+ },[loading,cycle])
+ return {visible,progress}
+}
+function TrendChart({data,target,loading,cycle}:{data:ChartData;target:number;loading:boolean;cycle:number}){
+ const svgRef=useRef<SVGSVGElement>(null); const [viewHeight,setViewHeight]=useState(265); const [historyFrequency,setHistoryFrequency]=useState<'auto'|'all'|'weekly'>('auto'); const [chartView,setChartView]=useState<'accumulated'|'dailyPaid'>('accumulated'); const presentation=useLoadingPresentation(loading,cycle)
+ useEffect(()=>{const svg=svgRef.current;if(!svg)return undefined;const update=()=>{if(!svg.clientWidth)return;const next=Math.max(265,Math.round(svg.clientHeight/svg.clientWidth*680));setViewHeight(current=>current===next?current:next)};const observer=new ResizeObserver(update);observer.observe(svg);update();return()=>observer.disconnect()},[presentation.visible])
+ if(presentation.visible)return <div className="trend chart-loading-placeholder" role="status"><span>Carregando...</span><div className="chart-loading-track" role="progressbar" aria-label="Carregamento do histórico" aria-valuemin={0} aria-valuemax={100} aria-valuenow={presentation.progress}><i style={{width:presentation.progress+'%'}}/></div><strong>{presentation.progress}%</strong></div>
  const plotTop=38; const plotBottom=viewHeight-52; const plotHeight=plotBottom-plotTop
  if(!data.some(item=>item.daily.length)){
  const history=data.history??[]
@@ -88,8 +119,8 @@ function TrendChart({data,target}:{data:ChartData;target:number}){
    const latestByDay=new Map<string,HistoryPoint>(); history.forEach(point=>latestByDay.set(dayKey(point.referenceAt),point))
    const dailyHistory=[...latestByDay.values()].sort((a,b)=>Date.parse(a.referenceAt)-Date.parse(b.referenceAt))
    const dailyPoints=dailyHistory.map((point,index)=>({point,value:index?Math.max(0,point.paid-dailyHistory[index-1].paid):point.paid}))
-   const maxDaily=Math.max(...dailyPoints.map(point=>point.value),1); const magnitude=10**Math.floor(Math.log10(maxDaily)); const normalized=maxDaily/magnitude; const dailyMax=(normalized<=1?1:normalized<=2?2:normalized<=5?5:10)*magnitude; const tickStep=dailyMax<=5?1:dailyMax/5; const dailyTicks=Array.from({length:Math.round(dailyMax/tickStep)+1},(_,index)=>index*tickStep); const plotLeft=74; const plotRight=644; const dailyPointsWithPosition=dailyPoints.map((point,index)=>{const x=dailyPoints.length===1?(plotLeft+plotRight)/2:plotLeft+index*(plotRight-plotLeft)/(dailyPoints.length-1);return {...point,x,y:plotBottom-point.value/dailyMax*plotHeight}}); const visiblePointIndexes=historyFrequency==='all'?new Set(dailyPointsWithPosition.map((_,index)=>index)):(()=>{const count=Math.min(dailyPointsWithPosition.length,8);return new Set(Array.from({length:count},(_,index)=>count===1?0:Math.round(index*(dailyPointsWithPosition.length-1)/(count-1))))})(); const latest=dailyPointsWithPosition.at(-1)
-   return <div className="trend">
+   const maxDaily=Math.max(...dailyPoints.map(point=>point.value),1); const magnitude=10**Math.floor(Math.log10(maxDaily)); const normalized=maxDaily/magnitude; const dailyMax=(normalized<=1?1:normalized<=2?2:normalized<=5?5:10)*magnitude; const tickStep=dailyMax<=5?1:dailyMax/5; const dailyTicks=Array.from({length:Math.round(dailyMax/tickStep)+1},(_,index)=>index*tickStep); const plotLeft=74; const plotRight=644; const dailyPointsWithPosition=dailyPoints.map((point,index)=>{const x=dailyPoints.length===1?(plotLeft+plotRight)/2:plotLeft+index*(plotRight-plotLeft)/(dailyPoints.length-1);return {...point,x,y:plotBottom-point.value/dailyMax*plotHeight,index}}); const visiblePointIndexes=historyFrequency==='all'?new Set(dailyPointsWithPosition.map((_,index)=>index)):(()=>{const count=Math.min(dailyPointsWithPosition.length,8);return new Set(Array.from({length:count},(_,index)=>count===1?0:Math.round(index*(dailyPointsWithPosition.length-1)/(count-1))))})(); const latest=dailyPointsWithPosition.at(-1)
+   return <div className="trend chart-content-enter">
 <div className="chart-legend chart-history-legend"><div className="chart-history-toolbar"><div className="chart-history-series"><span className="legend-daily-paid">Novos pagos por dia</span></div><button type="button" className="chart-history-toggle" onClick={()=>setChartView('accumulated')}>Ver acumulado</button><label className="chart-history-frequency">Pontos <select aria-label="Frequência dos pontos do gráfico" value={historyFrequency} onChange={event=>setHistoryFrequency(event.target.value as 'auto'|'all'|'weekly')}><option value="auto">Automático</option><option value="all">Todas as importações</option><option value="weekly">Semanal</option></select></label></div></div>
 <svg ref={svgRef} viewBox={`0 0 680 ${viewHeight}`} role="img" aria-label="Novas inscrições pagas por dia"><g className="chart-grid">{dailyTicks.map(value=>{const y=plotBottom-value/dailyMax*plotHeight;return <g key={value}><line x1={plotLeft} x2={plotRight} y1={y} y2={y}/><text className="chart-axis-label" x={plotLeft-10} y={y+3} textAnchor="end">{number.format(value)}</text></g>})}</g><line className="chart-axis" x1={plotLeft} x2={plotRight} y1={plotBottom} y2={plotBottom}/><text className="chart-axis-title" transform={`rotate(-90 17 ${(plotTop+plotBottom)/2})`} x="17" y={(plotTop+plotBottom)/2} textAnchor="middle">Novos pagos</text><polyline className="chart-line chart-daily-paid-line" points={dailyPointsWithPosition.map(({x,y})=>`${x},${y}`).join(' ')}/>{dailyPointsWithPosition.map(({point,value,x,y},pointIndex)=><g key={point.referenceAt}>{visiblePointIndexes.has(pointIndex)&&<><title>{`${new Date(point.referenceAt).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})} · ${number.format(value)} novos pagos`}</title><circle className="chart-daily-paid-dot" cx={x} cy={y} r="3.5"/><text className="chart-daily-paid-value" x={x} y={y-10} textAnchor="middle">{number.format(value)}</text><text className="chart-date" x={x} y={plotBottom+25} textAnchor="middle">{new Date(point.referenceAt).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})}</text></>}</g>)}{latest&&<text className="chart-latest-value chart-daily-paid-latest" x={latest.x} y={latest.y-22} textAnchor="middle">{number.format(latest.value)}</text>}</svg>
 <p className="chart-footnote">Variação positiva de inscritos pagos em relação à última importação de cada dia.</p>
@@ -99,12 +130,12 @@ function TrendChart({data,target}:{data:ChartData;target:number}){
   const magnitude=10**Math.floor(Math.log10(maxCount)); const normalized=maxCount/magnitude; const yMax=(normalized<=1?1:normalized<=2?2:normalized<=5?5:10)*magnitude; const tickStep=yMax<=5?1:yMax/5; const yTicks=Array.from({length:Math.round(yMax/tickStep)+1},(_,index)=>index*tickStep); const axisLabel=(value:number)=>value>=1000?`${number.format(value/1000)} mil`:number.format(value)
   const plotLeft=74; const plotRight=644
   const baseline=history[0]
-  const points=history.map((point,index)=>{const x=history.length===1?(plotLeft+plotRight)/2:plotLeft+index*(plotRight-plotLeft)/(history.length-1);return {point,x,totalY:plotBottom-point.total/yMax*plotHeight,paidY:plotBottom-point.paid/yMax*plotHeight}})
+  const points=history.map((point,index)=>{const x=history.length===1?(plotLeft+plotRight)/2:plotLeft+index*(plotRight-plotLeft)/(history.length-1);return {point,x,totalY:plotBottom-point.total/yMax*plotHeight,paidY:plotBottom-point.paid/yMax*plotHeight,index}})
   const changeLabel=(current:number,initial:number)=>initial===0?'sem base para comparar':new Intl.NumberFormat('pt-BR',{style:'percent',signDisplay:'exceptZero',maximumFractionDigits:1}).format((current-initial)/initial)
   const visiblePointIndexes=historyFrequency==='all'?new Set(points.map((_,index)=>index)):historyFrequency==='weekly'?(()=>{const weeklyIndexes=new Set<number>();let previousWeek='';points.forEach(({point},index)=>{const date=new Date(point.referenceAt);const day=(date.getDay()+6)%7;date.setDate(date.getDate()-day);const week=`${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;if(week!==previousWeek){weeklyIndexes.add(index);previousWeek=week}else{weeklyIndexes.delete(index-1);weeklyIndexes.add(index)}});if(points.length)weeklyIndexes.add(points.length-1);return weeklyIndexes})():(()=>{const count=Math.min(points.length,8);return new Set(Array.from({length:count},(_,index)=>count===1?0:Math.round(index*(points.length-1)/(count-1))))})()
   const latest=points.at(-1)
   const latestPaidLabelBelow=Boolean(latest&&(Math.abs(latest.totalY-latest.paidY)<42||latest.paidY-30<plotTop))
-  return <div className="trend">
+  return <div className="trend chart-content-enter">
 <div className="chart-legend chart-history-legend">
 <div className="chart-history-toolbar">
 <div className="chart-history-series">
@@ -112,13 +143,13 @@ function TrendChart({data,target}:{data:ChartData;target:number}){
 </div><button type="button" className="chart-history-toggle" onClick={()=>setChartView('dailyPaid')}>Ver novos pagos por dia</button>
 <label className="chart-history-frequency">Pontos <select aria-label="Frequência dos pontos do gráfico" value={historyFrequency} onChange={event=>setHistoryFrequency(event.target.value as 'auto'|'all'|'weekly')}><option value="auto">Automático</option><option value="all">Todas as importações</option><option value="weekly">Semanal</option></select></label>
 </div>
+
 </div>
 <svg ref={svgRef} viewBox={`0 0 680 ${viewHeight}`} role="img" aria-label="Evolução histórica de inscritos totais e pagos">
 <g className="chart-grid">{yTicks.map(value=>{const y=plotBottom-value/yMax*plotHeight;return <g key={value}><line x1={plotLeft} x2={plotRight} y1={y} y2={y}/><text className="chart-axis-label" x={plotLeft-10} y={y+3} textAnchor="end">{axisLabel(value)}</text></g>})}</g>
 <line className="chart-axis" x1={plotLeft} x2={plotRight} y1={plotBottom} y2={plotBottom}/>
 <text className="chart-axis-title" transform={`rotate(-90 17 ${(plotTop+plotBottom)/2})`} x="17" y={(plotTop+plotBottom)/2} textAnchor="middle">Inscritos</text>
-<polyline className="chart-line chart-total-line" points={points.map(({x,totalY})=>`${x},${totalY}`).join(' ')}/>
-<polyline className="chart-line chart-paid-line" points={points.map(({x,paidY})=>`${x},${paidY}`).join(' ')}/>
+<polyline className="chart-line chart-total-line" points={points.map(({x,totalY})=>`${x},${totalY}`).join(' ')}/><polyline className="chart-line chart-paid-line" points={points.map(({x,paidY})=>`${x},${paidY}`).join(' ')}/>
 {points.map(({point,x,totalY,paidY},pointIndex)=><g key={point.referenceAt}>
 {visiblePointIndexes.has(pointIndex)&&<><title>{`${new Date(point.referenceAt).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})} · Inscrições ${changeLabel(point.total,baseline.total)} · Pagos ${changeLabel(point.paid,baseline.paid)} (desde o início)`}</title>
 <circle className="chart-dot chart-total-dot" cx={x} cy={totalY} r="5"/>
@@ -130,7 +161,7 @@ function TrendChart({data,target}:{data:ChartData;target:number}){
 </div>
  }
  const points=Array.from({length:10},(_,index)=>({day:`Dia ${index+1}`,value:data.reduce((sum,item)=>sum+(item.daily[index]?.value??0),0)})); const max=Math.max(target,...points.map(point=>point.value),1); const pointList=points.map((point,index)=>`${72+index*65},${plotBottom-point.value/max*plotHeight}`).join(' '); const targetY=plotBottom-target/max*plotHeight
- return <div className="trend">
+ return <div className="trend chart-content-enter">
 <div className="chart-legend">
 <span className="legend-paid">Inscritos pagos</span>
 <span className="legend-target">Meta prevista</span>
@@ -148,8 +179,8 @@ function TrendChart({data,target}:{data:ChartData;target:number}){
 <p className="chart-footnote">Dados acumulados por dia de inscricao</p>
 </div>
 }
-function CourseChart({rows,summaryData,periodLabelData,scope,asOf,period,onPeriodChange,statusFiltered}:{rows:CourseChartRow[];summaryData:Enrollment[];periodLabelData:Enrollment[];scope:string;asOf:string;period:CoursePeriod;onPeriodChange:(period:CoursePeriod)=>void;statusFiltered:boolean}){
- const orderedRows=[...rows].sort((a,b)=>(((b.paid+b.unpaid)/Math.max(b.vacancies,1))-((a.paid+a.unpaid)/Math.max(a.vacancies,1)))||((b.paid+b.unpaid)-(a.paid+a.unpaid))||a.course.localeCompare(b.course,'pt-BR'))
+function CourseChart({rows,summaryData,periodLabelData,scope,asOf,period,onPeriodChange,statusFiltered,includeSecondOption}:{rows:CourseChartRow[];summaryData:Enrollment[];periodLabelData:Enrollment[];scope:string;asOf:string;period:CoursePeriod;onPeriodChange:(period:CoursePeriod)=>void;statusFiltered:boolean;includeSecondOption:boolean}){
+ const orderedRows=[...rows].sort((a,b)=>((b.paid/Math.max(b.vacancies,1))-(a.paid/Math.max(a.vacancies,1)))||(b.paid-a.paid)||a.course.localeCompare(b.course,'pt-BR'))
  const rowKey=(row:CourseChartRow)=>`${row.course}\u0000${row.period}`
  const periodsByCourse=new Map<string,Set<string>>()
  periodLabelData.forEach(item=>{const periods=periodsByCourse.get(item.course)??new Set<string>();periods.add(item.period);periodsByCourse.set(item.course,periods)})
@@ -192,10 +223,11 @@ function CourseChart({rows,summaryData,periodLabelData,scope,asOf,period,onPerio
 <span className="course-target-range" aria-hidden="true"><i className="course-target-line" style={{left:`${targetWidth}%`}}/><span className="course-target-label" style={{left:`${targetWidth}%`}}>Meta 1,5x</span></span>
 {enrichedRows.map((row,index)=>{const paidWidth=Math.min(row.paidDemand/scaleMax*100,100);const totalWidth=Math.min(row.totalDemand/scaleMax*100,100);const key=rowKey(row);const active=activeCourse===key;const tooltipId=`course-tooltip-${index}`;const label=`${chartCourseName(row.course)}${(periodsByCourse.get(row.course)?.size??0)>1?` - ${row.period}`:''}`;return <button type="button" className={`course-row${active?' is-active':''}`} key={key} aria-describedby={active?tooltipId:undefined} onMouseEnter={()=>setActiveCourse(key)} onMouseLeave={()=>setActiveCourse(current=>current===key?'':current)} onFocus={()=>setActiveCourse(key)} onBlur={()=>setActiveCourse(current=>current===key?'':current)} onClick={()=>setActiveCourse(current=>current===key?'':key)}>
 <span className="course-row-label" title={label}>{label}</span>
-<CourseRowTrack paid={row.paid} unpaid={row.unpaid} demand={row.paidDemand} paidWidth={paidWidth} totalWidth={totalWidth}>
+<CourseRowTrack paid={row.paid} unpaid={row.unpaid} secondOptionTotal={includeSecondOption?row.secondOptionPaid+row.secondOptionUnpaid:0} demand={row.paidDemand} paidWidth={paidWidth} totalWidth={totalWidth}>
 {active&&<span className="course-tooltip" id={tooltipId} role="tooltip" style={{left:`${totalWidth}%`}}>
 <strong>Inscritos: {number.format(row.total)}</strong>
 <span>({number.format(row.paid)} pagos | {number.format(row.unpaid)} pendentes)</span>
+{includeSecondOption&&<small>2ª opção: {number.format(row.secondOptionPaid)} pagos | {number.format(row.secondOptionUnpaid)} pendentes</small>}
 <small>{number.format(row.vacancies)} vagas · {row.paidDemand.toFixed(1).replace('.',',')}x pagos/vaga</small>
 <small>{row.offerCount} {row.offerCount===1?'turma':'turmas'} · {row.period}</small>
 </span>}
@@ -211,22 +243,63 @@ function CourseChart({rows,summaryData,periodLabelData,scope,asOf,period,onPerio
 </div>
 }
 export default function App(){
- const [filters,setFilters]=useState<Filters>(initialFilters); const [analysisScope,setAnalysisScope]=useState<AnalysisScope>({presential:true,ead:false,trainees:false}); const [selectedEtec,setSelectedEtec]=useState(''); const [geographicScope,setGeographicScope]=useState<{label:string;etecs:string[]}|null>(null); const [mapResetKey,setMapResetKey]=useState(0); const [analysisTab,setAnalysisTab]=useState<'evolution'|'courses'|'performance'|'reports'>('evolution'); const [coursePeriod,setCoursePeriod]=useState<CoursePeriod>('all'); const [statusFilter,setStatusFilter]=useState<OfferStatus|null>(null); const [colorMapByStatus,setColorMapByStatus]=useState(true); const [dashboard,setDashboard]=useState<DashboardPayload|null>(null); const [snapshotEndAt,setSnapshotEndAt]=useState(''); const [importOpen,setImportOpen]=useState(false); const [importPassword,setImportPassword]=useState(''); const [showImportPassword,setShowImportPassword]=useState(false); const [importFile,setImportFile]=useState<File|null>(null); const [importMessage,setImportMessage]=useState(''); const [importing,setImporting]=useState(false); const [mobileMenuOpen,setMobileMenuOpen]=useState(false)
+ const [considerSecondOption,setConsiderSecondOption]=useState(false)
+ const [historyState,setHistoryState]=useState<{phase:'loading'|'ready'|'error';message:string}>({phase:'loading',message:''})
+ const [historyDates,setHistoryDates]=useState<string[]>([])
+ const [historyPreview,setHistoryPreview]=useState<SnapshotSeries[]>([])
+ const [dashboardRefreshing,setDashboardRefreshing]=useState(false)
+ const [historyAttempt,setHistoryAttempt]=useState(0)
+ const [filters,setFilters]=useState<Filters>(initialFilters); const [analysisScope,setAnalysisScope]=useState<AnalysisScope>({presential:true,ead:false,trainees:false}); const [selectedEtec,setSelectedEtec]=useState(''); const [geographicScope,setGeographicScope]=useState<{label:string;etecs:string[]}|null>(null); const [mapResetKey,setMapResetKey]=useState(0); const [analysisTab,setAnalysisTab]=useState<'evolution'|'courses'|'performance'|'reports'>('evolution'); const [coursePeriod,setCoursePeriod]=useState<CoursePeriod>('all'); const [statusFilter,setStatusFilter]=useState<OfferStatus|null>(null); const [colorMapByStatus,setColorMapByStatus]=useState(true); const [dashboard,setDashboard]=useState<DashboardPayload|null>(null); const [mapReady,setMapReady]=useState(false); const onMapReady=useCallback(()=>setMapReady(true),[]); const [snapshotEndAt,setSnapshotEndAt]=useState(''); const [importOpen,setImportOpen]=useState(false); const [importPassword,setImportPassword]=useState(''); const [showImportPassword,setShowImportPassword]=useState(false); const [importFile,setImportFile]=useState<File|null>(null); const [importMessage,setImportMessage]=useState(''); const [importing,setImporting]=useState(false); const [mobileMenuOpen,setMobileMenuOpen]=useState(false)
  const [performanceSort,setPerformanceSort]=useState<{key:PerformanceSortKey;direction:'asc'|'desc'}>({key:'regional',direction:'asc'})
  useEffect(()=>{if(!mobileMenuOpen)return undefined;const close=(event:PointerEvent)=>{if(!(event.target instanceof Element)||!event.target.closest('.header-tools'))setMobileMenuOpen(false)};const escape=(event:KeyboardEvent)=>{if(event.key==='Escape')setMobileMenuOpen(false)};document.addEventListener('pointerdown',close);document.addEventListener('keydown',escape);return()=>{document.removeEventListener('pointerdown',close);document.removeEventListener('keydown',escape)}},[mobileMenuOpen])
- useEffect(()=>{let cancelled=false;void fetch(apiUrl('/api/dashboard-data')).then(async response=>response.ok?readJson<{snapshots?:SnapshotSeries[];etecs?:EtecPoint[]}>(response):null).then(payload=>{if(cancelled)return;setDashboard({etecs:payload?.etecs??[],snapshotSeries:payload?.snapshots??[]})}).catch(()=>{if(!cancelled)setDashboard({etecs:[],snapshotSeries:[]})});return()=>{cancelled=true}},[])
- const {etecs,snapshotSeries}=dashboard??{etecs:[],snapshotSeries:[]}; const rangeStartAt=snapshotSeries.at(0)?.referenceAt||''; const rangeEndAt=snapshotEndAt||snapshotSeries.at(-1)?.referenceAt||''; const visibleSnapshotSeries=snapshotSeries.filter(snapshot=>snapshot.referenceAt>=rangeStartAt&&snapshot.referenceAt<=rangeEndAt); const selectedSnapshot=visibleSnapshotSeries.at(-1)??snapshotSeries.at(-1); const enrollments=selectedSnapshot?.enrollments??[]
+ useEffect(()=>{
+  const controller=new AbortController()
+  void (async()=>{
+   const cached=readLatestDashboardCache()
+   if(cached){
+    setDashboard({etecs:cached.etecs??[],snapshotSeries:cached.snapshots??[]})
+    setDashboardRefreshing(true)
+   }
+   try{
+    const payload=await fetchDashboard(apiUrl('/api/dashboard-data'))
+    if(controller.signal.aborted)return
+    setDashboardRefreshing(false)
+    setDashboard({etecs:payload.etecs??[],snapshotSeries:payload.snapshots??[]})
+    setHistoryDates(payload.history?.map(item=>item.referenceAt)??[])
+    setHistoryPreview([])
+    setHistoryState({phase:'loading',message:''})
+    // Give the current indicators/map a paint before starting background requests.
+    await new Promise(resolve=>window.setTimeout(resolve,50))
+    controller.signal.throwIfAborted()
+    const history=await loadDashboardHistory(payload,apiUrl('/api/dashboard-data'),controller.signal,()=>{},partial=>{
+     if(!controller.signal.aborted)setHistoryPreview(partial)
+    })
+    if(controller.signal.aborted)return
+    setHistoryPreview(history)
+    setDashboard({etecs:payload.etecs??[],snapshotSeries:history})
+    setHistoryState({phase:'ready',message:''})
+   }catch(error){if(!controller.signal.aborted){setDashboardRefreshing(false);setHistoryState({phase:'error',message:error instanceof Error?error.message:'Não foi possível carregar o histórico.'})}}
+  })()
+  return()=>controller.abort()
+ },[historyAttempt])
+ const {etecs,snapshotSeries}=dashboard??{etecs:[],snapshotSeries:[]}; const rangeStartAt=snapshotSeries.at(0)?.referenceAt||''; const rangeEndAt=snapshotEndAt||snapshotSeries.at(-1)?.referenceAt||''; const sourceSnapshotSeries=snapshotSeries.filter(snapshot=>snapshot.referenceAt>=rangeStartAt&&snapshot.referenceAt<=rangeEndAt)
+ const secondOptionAvailable=hasSecondOption(sourceSnapshotSeries.at(-1)?.enrollments??[])
+ const includeSecondOption=considerSecondOption&&secondOptionAvailable
+ const visibleSnapshotSeries=includeSecondOption?secondOptionSeries(sourceSnapshotSeries):sourceSnapshotSeries
+ const selectedSnapshot=visibleSnapshotSeries.at(-1)??snapshotSeries.at(-1); const enrollments=selectedSnapshot?.enrollments??[]
  const isEadOffer=(item:Enrollment)=>/\bEAD\b/i.test(item.course)||normalizeName(item.period).includes('ead')||normalizeName(item.period)==='on-line'; const matchesAnalysisScope=(item:Enrollment)=>item.isTrainee?analysisScope.trainees:isEadOffer(item)?analysisScope.ead:analysisScope.presential
- const etecByName=new Map(etecs.map(etec=>[etec.name,etec])); const regionalByEtec=new Map(etecs.map(etec=>{const municipality=normalizeName(etec.municipality);return [etec.name,mapRegionalByMunicipality.get(municipality)??mapRegionalFallbackByMunicipality.get(municipality)]})); const regionalFor=(item:Enrollment)=>regionalByEtec.get(item.etec)??item.regional; const cityFor=(item:Enrollment)=>etecByName.get(item.etec)?.municipality??''; const dependentKeys:FilterKey[]=['regional','city','etec','axis','offerType','course','period']; const matchesFilters=(item:Enrollment,current:Filters,ignored?:FilterKey)=>dependentKeys.every(candidate=>candidate===ignored||!current[candidate].length||(candidate==='regional'?current.regional.includes(regionalFor(item)):candidate==='city'?current.city.includes(cityFor(item)):candidate==='axis'?current.axis.includes(item.axis??''):candidate==='offerType'?current.offerType.includes(offerTypeFor(item)):current[candidate].includes(item[candidate]))); const valuesFor=(key:FilterKey,current:Filters,scope=geographicScope)=>{const items=enrollments.filter(item=>(!scope||scope.etecs.includes(item.etec))&&matchesFilters(item,current,key)); const validItems=(key==='axis'||key==='course'||key==='period')?items.filter(item=>!item.isTrainee):items; const values=[...new Set(validItems.map(item=>key==='regional'?regionalFor(item):key==='city'?cityFor(item):key==='axis'?item.axis??'':key==='offerType'?offerTypeFor(item):item[key]).filter(Boolean))]; return values.sort((left,right)=>{if(key!=='offerType')return left.localeCompare(right,'pt-BR');const leftOrder=offerTypeOrder.indexOf(left);const rightOrder=offerTypeOrder.indexOf(right);return (leftOrder<0?Number.MAX_SAFE_INTEGER:leftOrder)-(rightOrder<0?Number.MAX_SAFE_INTEGER:rightOrder)||left.localeCompare(right,'pt-BR')})}; const mapRegionalOptions=REGIONAIS.features.map(feature=>String(feature.properties.regional??'')).filter(regional=>enrollments.some(item=>regionalFor(item)===regional)); const normalizeFilters=(next:Filters,preserve?:FilterKey,scope=geographicScope)=>{let normalized=next; let changed=true; while(changed){changed=false; dependentKeys.forEach(key=>{const values=key==='regional'?mapRegionalOptions:valuesFor(key,normalized,scope);const nextValues=key===preserve?normalized[key]:normalized[key].filter(value=>values.includes(value));if(nextValues.length!==normalized[key].length){normalized={...normalized,[key]:nextValues};changed=true}})} return normalized}; const options={regional:mapRegionalOptions,city:valuesFor('city',filters),etec:valuesFor('etec',filters),axis:valuesFor('axis',filters),offerType:valuesFor('offerType',filters),course:valuesFor('course',filters),period:valuesFor('period',filters)}
- const updateFilter=(key:FilterKey,value:string[])=>{if(key==='city'&&value.length===1){const city=value[0];const cityEtecs=etecs.filter(etec=>etec.municipality===city).map(etec=>etec.name);selectGeographicScope(city,cityEtecs);return}setGeographicScope(null);setFilters(current=>normalizeFilters({...current,[key]:value},key,null));if(key!=='regional'&&key!=='city')setMapResetKey(current=>current+1);setSelectedEtec(key==='etec'&&value.length===1?value[0]:'')}; const selectEtec=(etec:string)=>{const city=etecByName.get(etec)?.municipality??'';const scope={label:city,etecs:etecs.filter(unit=>unit.municipality===city).map(unit=>unit.name)};setSelectedEtec(etec);setGeographicScope(scope);setFilters(current=>normalizeFilters({...current,city:city?[city]:[],etec:[etec]},'etec',scope))}; const selectGeographicScope=(label:string,scopedEtecs:string[])=>{const scope={label,etecs:scopedEtecs};const scopedCities=[...new Set(scopedEtecs.map(etec=>etecByName.get(etec)?.municipality).filter((city):city is string=>Boolean(city)))];const city=scopedCities.length===1?scopedCities[0]:'';setSelectedEtec('');setGeographicScope(scope);setFilters(current=>normalizeFilters({...current,city:city?[city]:[],etec:[]},city?'city':undefined,scope))}; const selectRegionalCities=(regional:string)=>{setSelectedEtec('');setGeographicScope(null);setFilters(current=>{const base={...current,regional:[],city:[],etec:[]};const availableCities=new Set(valuesFor('city',base,null));const cities=(MUN_BY_REGIONAL[regional]?.features??[]).map(feature=>String(feature.properties.name??'')).filter(city=>availableCities.has(city));return normalizeFilters({...base,city:cities},'city',null)})}; const clearGeographicScope=()=>{setSelectedEtec('');setGeographicScope(null);setFilters(current=>normalizeFilters({...current,city:[],etec:[]},undefined,null))}; const clearFilters=()=>{setSelectedEtec('');setGeographicScope(null);setStatusFilter(null);setFilters(initialFilters);setMapResetKey(current=>current+1)}
+ const etecByName=new Map(etecs.map(etec=>[etec.name,etec])); const regionalByEtec=new Map(etecs.map(etec=>{const municipality=normalizeName(etec.municipality);return [etec.name,mapRegionalByMunicipality.get(municipality)??mapRegionalFallbackByMunicipality.get(municipality)]})); const regionalFor=(item:Enrollment)=>regionalByEtec.get(item.etec)??item.regional; const cityFor=(item:Enrollment)=>etecByName.get(item.etec)?.municipality??''; const dependentKeys:FilterKey[]=['regional','city','etec','axis','offerType','course','period']; const matchesFilters=(item:Enrollment,current:Filters,ignored?:FilterKey)=>dependentKeys.every(candidate=>candidate===ignored||!current[candidate].length||(candidate==='regional'?current.regional.includes(regionalFor(item)):candidate==='city'?current.city.includes(cityFor(item)):candidate==='axis'?current.axis.includes(item.axis??''):candidate==='offerType'?current.offerType.includes(offerTypeFor(item)):current[candidate].includes(item[candidate]))); const valuesFor=(key:FilterKey,current:Filters,scope=geographicScope)=>{const items=enrollments.filter(item=>(!scope||scope.etecs.includes(item.etec))&&matchesFilters(item,current,key)); const validItems=(key==='axis'||key==='course'||key==='period')?items.filter(item=>!item.isTrainee):items; const values=[...new Set(validItems.map(item=>key==='regional'?regionalFor(item):key==='city'?cityFor(item):key==='axis'?item.axis??'':key==='offerType'?offerTypeFor(item):item[key]).filter(Boolean))]; return values.sort((left,right)=>{if(key!=='offerType')return left.localeCompare(right,'pt-BR');const leftOrder=offerTypeOrder.indexOf(left);const rightOrder=offerTypeOrder.indexOf(right);return (leftOrder<0?Number.MAX_SAFE_INTEGER:leftOrder)-(rightOrder<0?Number.MAX_SAFE_INTEGER:rightOrder)||left.localeCompare(right,'pt-BR')})}; const mapRegionalOptions=REGIONAL_NAMES.filter(regional=>enrollments.some(item=>regionalFor(item)===regional)); const normalizeFilters=(next:Filters,preserve?:FilterKey,scope=geographicScope)=>{let normalized=next; let changed=true; while(changed){changed=false; dependentKeys.forEach(key=>{const values=key==='regional'?mapRegionalOptions:valuesFor(key,normalized,scope);const nextValues=key===preserve?normalized[key]:normalized[key].filter(value=>values.includes(value));if(nextValues.length!==normalized[key].length){normalized={...normalized,[key]:nextValues};changed=true}})} return normalized}; const options={regional:mapRegionalOptions,city:valuesFor('city',filters),etec:valuesFor('etec',filters),axis:valuesFor('axis',filters),offerType:valuesFor('offerType',filters),course:valuesFor('course',filters),period:valuesFor('period',filters)}
+ const updateFilter=(key:FilterKey,value:string[])=>{if(key==='city'&&value.length===1){const city=value[0];const cityEtecs=etecs.filter(etec=>etec.municipality===city).map(etec=>etec.name);selectGeographicScope(city,cityEtecs);return}setGeographicScope(null);setFilters(current=>normalizeFilters({...current,[key]:value},key,null));if(key!=='regional'&&key!=='city')setMapResetKey(current=>current+1);setSelectedEtec(key==='etec'&&value.length===1?value[0]:'')}; const selectEtec=(etec:string)=>{const city=etecByName.get(etec)?.municipality??'';const scope={label:city,etecs:etecs.filter(unit=>unit.municipality===city).map(unit=>unit.name)};setSelectedEtec(etec);setGeographicScope(scope);setFilters(current=>normalizeFilters({...current,city:city?[city]:[],etec:[etec]},'etec',scope))}; const selectGeographicScope=(label:string,scopedEtecs:string[])=>{const scope={label,etecs:scopedEtecs};const scopedCities=[...new Set(scopedEtecs.map(etec=>etecByName.get(etec)?.municipality).filter((city):city is string=>Boolean(city)))];const city=scopedCities.length===1?scopedCities[0]:'';setSelectedEtec('');setGeographicScope(scope);setFilters(current=>normalizeFilters({...current,city:city?[city]:[],etec:[]},city?'city':undefined,scope))}; const selectRegionalCities=async(regional:string)=>{const {MUN_BY_REGIONAL}=await import('./data/aredMapData');setSelectedEtec('');setGeographicScope(null);setFilters(current=>{const base={...current,regional:[],city:[],etec:[]};const availableCities=new Set(valuesFor('city',base,null));const cities=(MUN_BY_REGIONAL[regional]?.features??[]).map(feature=>String(feature.properties.name??'')).filter(city=>availableCities.has(city));return normalizeFilters({...base,city:cities},'city',null)})}; const clearGeographicScope=()=>{setSelectedEtec('');setGeographicScope(null);setFilters(current=>normalizeFilters({...current,city:[],etec:[]},undefined,null))}; const clearFilters=()=>{setSelectedEtec('');setGeographicScope(null);setStatusFilter(null);setFilters(initialFilters);setMapResetKey(current=>current+1)}
  const uploadImport=async(event:FormEvent<HTMLFormElement>)=>{event.preventDefault();if(!importFile||!importPassword){setImportMessage('Informe a senha e selecione a planilha para continuar.');return}setImporting(true);setImportMessage('Validando e importando a planilha...');try{const response=await fetch(apiUrl('/api/import-inscricoes'),{method:'POST',headers:{'X-Import-Password':importPassword,'Content-Type':importFile.type||'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet','X-File-Name':encodeURIComponent(importFile.name)},body:importFile});const payload=await readJson<{error?:string;records?:number}>(response);if(!response.ok)throw new Error(payload.error??'Não foi possível importar a planilha.');setImportPassword('');setImportMessage(`Importação publicada com ${number.format(payload.records??0)} ofertas. Atualizando o painel...`);window.setTimeout(()=>window.location.reload(),900)}catch(error){setImportMessage(error instanceof Error?error.message:'Não foi possível importar a planilha.')}finally{setImporting(false)}}
  const matchesBaseScope=(item:Enrollment)=>matchesFilters(item,filters)&&(!geographicScope||geographicScope.etecs.includes(item.etec))
  const matchesStatus=(item:Enrollment)=>!statusFilter||(item.vacancies>0&&offerStatusFor(item)===statusFilter)
  const matchesActiveScope=(item:Enrollment)=>matchesAnalysisScope(item)&&matchesBaseScope(item)&&(!statusFilter||(!item.isTrainee&&matchesStatus(item)))
  const matchesPresentialOfferScope=(item:Enrollment)=>!item.isTrainee&&!isEadOffer(item)&&matchesBaseScope(item)
- const scopedHistory=visibleSnapshotSeries.map(({referenceAt,enrollments:items})=>{const scoped=items.filter(matchesActiveScope);const regular=scoped.filter(item=>!item.isTrainee);const paid=scoped.reduce((sum,item)=>sum+item.paid,0);const unpaid=scoped.reduce((sum,item)=>sum+item.unpaid,0);const trainee=scoped.filter(item=>item.isTrainee).reduce((sum,item)=>sum+item.paid+item.unpaid,0);const vacancies=regular.reduce((sum,item)=>sum+item.vacancies,0);return {referenceAt,total:paid+unpaid,paid,unpaid,trainee,regular:paid+unpaid-trainee,vacancies}})
+ const historySnapshots=(historyState.phase==='ready'?visibleSnapshotSeries:historyPreview).filter(snapshot=>!rangeEndAt||snapshot.referenceAt<=rangeEndAt)
+ const scopedHistory=historySnapshots.map(({referenceAt,enrollments:items})=>{const scoped=items.filter(matchesActiveScope);const regular=scoped.filter(item=>!item.isTrainee);const paid=scoped.reduce((sum,item)=>sum+item.paid,0);const unpaid=scoped.reduce((sum,item)=>sum+item.unpaid,0);const trainee=scoped.filter(item=>item.isTrainee).reduce((sum,item)=>sum+item.paid+item.unpaid,0);const vacancies=regular.reduce((sum,item)=>sum+item.vacancies,0);return {referenceAt,total:paid+unpaid,paid,unpaid,trainee,regular:paid+unpaid-trainee,vacancies}})
  const data=Object.assign(enrollments.filter(matchesActiveScope),{history:scopedHistory}) as ChartData
- const courseRows=[...data.filter(item=>!item.isTrainee&&matchesCoursePeriod(item.period,coursePeriod)).reduce((rows,item)=>{const key=`${item.course}\u0000${item.period}`;const current=rows.get(key)??{course:item.course,period:item.period,paid:0,unpaid:0,vacancies:0,offerCount:0};current.paid+=item.paid;current.unpaid+=item.unpaid;current.vacancies+=item.vacancies;current.offerCount++;rows.set(key,current);return rows},new Map<string,CourseChartRow>()).values()].sort((a,b)=>b.paid-a.paid||a.course.localeCompare(b.course,'pt-BR'))
+ const chartLoading=historyState.phase==='loading'
+ const courseRows=[...data.filter(item=>!item.isTrainee&&matchesCoursePeriod(item.period,coursePeriod)).reduce((rows,item)=>{const key=`${item.course}\u0000${item.period}`;const current=rows.get(key)??{course:item.course,period:item.period,paid:0,unpaid:0,vacancies:0,offerCount:0,secondOptionPaid:0,secondOptionUnpaid:0};current.paid+=item.paid;current.unpaid+=item.unpaid;current.vacancies+=item.vacancies;current.offerCount++;current.secondOptionPaid+=item.secondOptionPaid??0;current.secondOptionUnpaid+=item.secondOptionUnpaid??0;rows.set(key,current);return rows},new Map<string,CourseChartRow>()).values()].sort((a,b)=>b.paid-a.paid||a.course.localeCompare(b.course,'pt-BR'))
  const totals=data.reduce((r,item)=>({paid:r.paid+item.paid,unpaid:r.unpaid+item.unpaid,vacancies:r.vacancies+(item.isTrainee?0:item.vacancies),target:r.target+item.target,trainee:r.trainee+(item.isTrainee?item.paid+item.unpaid:0),regular:r.regular+(item.isTrainee?0:item.paid+item.unpaid),regularPaid:r.regularPaid+(item.isTrainee?0:item.paid)}),{paid:0,unpaid:0,vacancies:0,target:0,trainee:0,regular:0,regularPaid:0})
  const total=totals.paid+totals.unpaid
  const presentialOfferData=enrollments.filter(matchesPresentialOfferScope)
@@ -237,7 +310,7 @@ export default function App(){
  const geographicScopeIsMunicipality=Boolean(geographicScope?.etecs.every(name=>etecs.find(etec=>etec.name===name)?.municipality===geographicScope.label)); const whatsappScope=selectedEtec?`Local de oferta: ${selectedEtecDisplayLabel}`:filters.etec.length===1?`Local de oferta: ${formatEtecLabel(etecByName.get(filters.etec[0])!)}`:filters.etec.length>1?`${number.format(filters.etec.length)} locais de oferta selecionados`:filters.city.length===1?`Cidade: ${filters.city[0]}`:filters.city.length>1?`${number.format(filters.city.length)} cidades selecionadas`:geographicScope?`${geographicScopeIsMunicipality?'Cidade':'Regional'}: ${geographicScope.label}`:filters.regional.length===1?`Regional: ${filters.regional[0]}`:filters.regional.length>1?`${number.format(filters.regional.length)} regionais selecionadas`:'Estado de São Paulo'; const selectedCityRegionals=[...new Set(filters.city.map(city=>mapRegionalByMunicipality.get(normalizeName(city))??mapRegionalFallbackByMunicipality.get(normalizeName(city))).filter((regional):regional is string=>Boolean(regional)))]; const selectedEtecMunicipalities=[...new Set(filters.etec.map(etec=>etecByName.get(etec)?.municipality).filter((city):city is string=>Boolean(city)))]; const selectedEtecRegionals=[...new Set(selectedEtecMunicipalities.map(city=>mapRegionalByMunicipality.get(normalizeName(city))??mapRegionalFallbackByMunicipality.get(normalizeName(city))).filter((regional):regional is string=>Boolean(regional)))]; const selectedMapMunicipalities=filters.city.length?filters.city:selectedEtecMunicipalities; const highlightedMapRegionals=filters.regional.length?filters.regional:selectedCityRegionals.length?selectedCityRegionals:selectedEtecRegionals; const focusedMapRegional=filters.regional.length===1?filters.regional[0]:selectedCityRegionals.length===1?selectedCityRegionals[0]:selectedEtecRegionals.length===1?selectedEtecRegionals[0]:geographicScope?(geographicScopeIsMunicipality?(mapRegionalByMunicipality.get(normalizeName(geographicScope.label))??''):geographicScope.label):''; const focusedMapMunicipality=geographicScopeIsMunicipality?(geographicScope?.label??''):(selectedEtec?etecByName.get(selectedEtec)?.municipality??'':'')
  const scopedUnits=selectedEtec?[selectedEtec]:filters.etec; const scopedSedes=new Set(scopedUnits.map(unit=>unit.split('.')[0])); const isSingleSede=scopedUnits.length>0&&scopedSedes.size===1; const hasMunicipalityScope=geographicScopeIsMunicipality||filters.city.length===1; const hasBroadGeographicScope=filters.regional.length>0||filters.city.length>1||Boolean(geographicScope&&!geographicScopeIsMunicipality)||(scopedUnits.length>0&&!isSingleSede); const performanceDimension=isSingleSede||hasMunicipalityScope?'course':hasBroadGeographicScope?'municipality':'regional'; const performanceColumn=performanceDimension==='course'?'Curso':performanceDimension==='municipality'?'Município':'Regional'; const performanceTabLabel=`Desempenho por ${performanceDimension==='course'?'Curso':performanceDimension==='municipality'?'Município':'Regional'}`
  const activeModes=[analysisScope.presential&&'Presencial',analysisScope.ead&&'EAD',analysisScope.trainees&&'Treineiros'].filter((mode):mode is string=>Boolean(mode))
- const enrollmentScope=activeModes.join(' + ')||'Nenhum tipo selecionado'
+ const enrollmentScope=`${activeModes.join(' + ')||'Nenhum tipo selecionado'} · ${includeSecondOption?'1ª + 2ª opção':'1ª opção'}`
  const demandRatio=totals.vacancies?totals.regularPaid/totals.vacancies:null
  const kpis=[['Inscritos totais',number.format(total),`${number.format(totals.trainee)} Treineiros incluidos`,'blue'],['Inscritos pagos',number.format(totals.paid),`${total?Math.round(totals.paid/total*100):0}% do total`,'green'],['Inscritos isentos',exemptionMetrics?number.format(exemptionMetrics.inscritos_com_isencao):'N/D','fonte de isenção indisponível','purple'],['Conversao',`${total?Math.round(totals.paid/total*100):0}%`,'Pagos / totais','amber'],['Vagas oferecidas',number.format(totals.vacancies),'somente ofertas regulares','cyan'],['Demanda efetiva',demandRatio===null?'N/A':`${demandRatio.toFixed(2).replace('.',',')}x`,'somente pagos / vagas regulares','orange']]
  const describeSelected=(label:string,values:string[],format=(value:string)=>value)=>values.length?`${label}: ${values.length===1?format(values[0]):`${values.length} selecionados`}`:''; const geographicSummary=selectedEtec?`Local de oferta: ${selectedEtecDisplayLabel}`:geographicScope?`${geographicScopeIsMunicipality?'Município':'Regional'}: ${geographicScope.label}`:''; const scopeSummary=[geographicSummary,describeSelected('Regional',filters.regional),describeSelected('Cidade',filters.city),!selectedEtec?describeSelected('Local de oferta',filters.etec,value=>{const etec=etecByName.get(value);return etec?formatEtecLabel(etec):value}):'',describeSelected('Eixo tecnológico',filters.axis),describeSelected('Curso',filters.course,compactCourseName),describeSelected('Período',filters.period)].filter(Boolean).join(' • ')||scope.replace('Sao','São')
@@ -261,11 +334,15 @@ export default function App(){
 <div className={`header-meta${mobileMenuOpen?' is-open':''}`} id="header-menu">
 <div className="analysis-scope" role="group" aria-label="Recorte">
 <span className="analysis-scope-title">Recorte</span>
-<div className="analysis-scope-options">{([['presential','Presencial'],['ead','EAD'],['trainees','Treineiros']] as const).map(([key,label])=><label key={key}><input type="checkbox" checked={analysisScope[key]} onChange={event=>setAnalysisScope(current=>({...current,[key]:event.target.checked}))}/><span>{label}</span></label>)}</div>
+<div className="analysis-scope-options">
+<label><input type="checkbox" checked={analysisScope.presential} onChange={event=>setAnalysisScope(current=>({...current,presential:event.target.checked}))}/><span>Presencial</span></label>
+<label className="second-option-toggle" title={secondOptionAvailable?'Soma pagos e não pagos da 1ª e da 2ª opção, mantendo as vagas.':'Esta importação não tem dados de 2ª opção. Importe a nova planilha para habilitar.'}><input type="checkbox" checked={includeSecondOption} disabled={!secondOptionAvailable} onChange={event=>setConsiderSecondOption(event.target.checked)}/><span>2° Opção</span></label>
+{([['ead','EAD'],['trainees','Treineiros']] as const).map(([key,label])=><label key={key}><input type="checkbox" checked={analysisScope[key]} onChange={event=>setAnalysisScope(current=>({...current,[key]:event.target.checked}))}/><span>{label}</span></label>)}
+</div>
 </div>
 {snapshotSeries.length?<label className="snapshot-filter">
 <span>Dados até</span>
-<select value={rangeEndAt} onChange={event=>setSnapshotEndAt(event.target.value)} aria-label="Dados até">
+<select value={rangeEndAt} disabled={historyState.phase!=='ready'} onChange={event=>setSnapshotEndAt(event.target.value)} aria-label="Dados até">
 {snapshotSeries.map(snapshot=><option key={snapshot.referenceAt} value={snapshot.referenceAt}>{formatSnapshotDate(snapshot.referenceAt)}</option>)}
 </select>
 </label>:<p className="empty-data-notice">Nenhuma planilha publicada nesta edição.</p>}
@@ -298,10 +375,14 @@ export default function App(){
 </div>
 </section>
 <section className="scope-row">
+{dashboard===null&&<p className="dashboard-loading" role="status">{historyState.phase==='error'?historyState.message:'Carregando dados atuais…'}{historyState.phase==='error'&&<button type="button" onClick={()=>setHistoryAttempt(value=>value+1)}>Tentar novamente</button>}</p>}
+{dashboardRefreshing&&<p className="dashboard-refresh-notice" role="status">Atualizando os dados atuais…</p>}
 <div>
 <span>VISUALIZANDO</span>
 <strong>{scopeSummary}</strong>
-</div>{(selectedEtec||geographicScope)&&<button className="selection-clear" type="button" onClick={clearFilters}>Limpar selecao</button>}</section>
+</div>{(selectedEtec||geographicScope)&&<button className="selection-clear" type="button" onClick={clearFilters}>Limpar selecao</button>}
+{includeSecondOption?<p className="second-option-note">Considerando 1ª + 2ª opção: as contagens representam opções de inscrição, podendo incluir a mesma pessoa em cursos diferentes. As vagas permanecem iguais.{visibleSnapshotSeries.length<sourceSnapshotSeries.length?' O histórico mostra apenas importações com dados de 2ª opção.':''}</p>:null}
+</section>
 <section className="dashboard-top">
 <section className="kpi-row consolidated-kpis">
 <article className="kpi-card enrollment-kpi">
@@ -322,7 +403,7 @@ export default function App(){
 </div>
 </article>
 <article className="kpi-card demand-kpi">
-<div className="demand-heading"><p>Vagas e demanda</p><span title={enrollmentScope}>Recorte selecionado</span></div>
+<div className="demand-heading"><p>Vagas e demanda</p><span title={enrollmentScope}>Demanda efetiva</span></div>
 <div className="demand-copy"><div className="demand-content"><div className="demand-values"><strong>{number.format(totals.vacancies)}</strong></div><small>{number.format(totals.regularPaid)} pagos efetivos</small></div></div>
 <div className="demand-badge" aria-label={demandRatio===null?'Demanda não aplicável: não há vagas no recorte':`${demandRatio.toFixed(2).replace('.',',')} pagos por vaga`}>
 <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
@@ -348,8 +429,8 @@ export default function App(){
 <span>{number.format(visible.length)} {visible.length===1?'local':'locais'}</span>
 </div>
 <div className="map-visual">
-<div className="map-heat-container"><D3GeographicMap etecs={etecs} selected={selectedEtec} visible={visible} selectedRegionals={highlightedMapRegionals} selectedMunicipalities={selectedMapMunicipalities} focusedRegional={focusedMapRegional} focusedMunicipality={focusedMapMunicipality} resetKey={mapResetKey} regionalDemands={mapRegionalDemands} municipalityDemands={mapMunicipalityDemands} regionalLocationStatusCounts={regionalLocationStatusCounts} municipalityLocationStatusCounts={municipalityLocationStatusCounts} colorByStatus={colorMapByStatus} mapStatusKey={mapStatusKey} onSelect={selectEtec} onGeographicSelect={selectGeographicScope} onRegionalCitiesSelect={selectRegionalCities} onGeographicClear={clearGeographicScope}/>
-{colorMapByStatus&&<div className="map-heat-legend" role="img" aria-label="Legenda de demanda: competitivo a partir de 2,0; aceitável a partir de 1,5; atenção a partir de 1,0; ruim a partir de 0,5; crítico abaixo de 0,5"><strong>Demanda pagos/vaga</strong><span><i className="heat-competitive"/>Competitivo ≥ 2,0</span><span><i className="heat-acceptable"/>Aceitável ≥ 1,5</span><span><i className="heat-attention"/>Atenção ≥ 1,0</span><span><i className="heat-bad"/>Ruim ≥ 0,5</span><span><i className="heat-critical"/>Crítico &lt; 0,5</span></div>}
+<div className="map-heat-container">{(!dashboard||!mapReady)&&<RegionalMapPreview/>}<div className={"map-stage"+(mapReady?" is-ready":"")}>{dashboard&&<Suspense fallback={null}><D3GeographicMap etecs={etecs} selected={selectedEtec} visible={visible} selectedRegionals={highlightedMapRegionals} selectedMunicipalities={selectedMapMunicipalities} focusedRegional={focusedMapRegional} focusedMunicipality={focusedMapMunicipality} resetKey={mapResetKey} regionalDemands={mapRegionalDemands} municipalityDemands={mapMunicipalityDemands} regionalLocationStatusCounts={regionalLocationStatusCounts} municipalityLocationStatusCounts={municipalityLocationStatusCounts} colorByStatus={colorMapByStatus} mapStatusKey={mapStatusKey} onSelect={selectEtec} onGeographicSelect={selectGeographicScope} onRegionalCitiesSelect={selectRegionalCities} onGeographicClear={clearGeographicScope} onReady={onMapReady}/></Suspense>}</div>
+{colorMapByStatus&&mapReady&&<div className="map-heat-legend" role="img" aria-label="Legenda de demanda: competitivo a partir de 2,0; aceitável a partir de 1,5; atenção a partir de 1,0; ruim a partir de 0,5; crítico abaixo de 0,5"><strong>Demanda pagos/vaga</strong><span><i className="heat-competitive"/>Competitivo ≥ 2,0</span><span><i className="heat-acceptable"/>Aceitável ≥ 1,5</span><span><i className="heat-attention"/>Atenção ≥ 1,0</span><span><i className="heat-bad"/>Ruim ≥ 0,5</span><span><i className="heat-critical"/>Crítico &lt; 0,5</span></div>}
 </div>
 </div>
 <p className="panel-note">Navegue pelas regionais e municípios, ou clique em um local para filtrar o painel.</p>
@@ -364,7 +445,7 @@ export default function App(){
 <button type="button" role="tab" aria-selected={analysisTab==='performance'} className={analysisTab==='performance'?'active':''} onClick={()=>setAnalysisTab('performance')}>{performanceTabLabel}</button>
 <button type="button" role="tab" aria-selected={analysisTab==='courses'} className={analysisTab==='courses'?'active':''} onClick={()=>setAnalysisTab('courses')}>Cursos</button>
 </div>
-{analysisTab==='evolution'?<TrendChart data={data} target={totals.target}/>:analysisTab==='courses'?<CourseChart rows={courseRows} summaryData={data.filter(item=>!item.isTrainee)} periodLabelData={enrollments.filter(item=>!item.isTrainee&&matchesAnalysisScope(item)&&matchesBaseScope(item))} scope={whatsappScope} asOf={rangeEndAt} period={coursePeriod} onPeriodChange={setCoursePeriod} statusFiltered={Boolean(statusFilter)}/>:analysisTab==='reports'?<EnrollmentReports snapshots={visibleSnapshotSeries.map(snapshot=>({...snapshot,enrollments:snapshot.enrollments.filter(matchesActiveScope)}))} scope={`${scopeSummary} · ${enrollmentScope}`} statusFiltered={Boolean(statusFilter)}/>:<div className="regional-table analysis-regional-table">
+{analysisTab==='evolution'?<><TrendChart data={data} target={totals.target} loading={chartLoading} cycle={historyAttempt}/>{chartLoading&&historyState.phase==='error'&&<p className="history-chart-error" role="status">Histórico interrompido: {historyState.message} <button type="button" onClick={()=>setHistoryAttempt(value=>value+1)}>Tentar novamente</button></p>}</>:analysisTab==='reports'&&historyState.phase!=='ready'?<div className="history-loading" role="status">{historyState.phase==='loading'?<><strong>Preparando relatórios…</strong><p>Os dados atuais do painel já estão disponíveis.</p></>:<><strong>Histórico indisponível</strong><p>{historyState.message}</p><button type="button" onClick={()=>setHistoryAttempt(value=>value+1)}>Tentar novamente</button></>}</div>:analysisTab==='courses'?<CourseChart rows={courseRows} summaryData={data.filter(item=>!item.isTrainee)} periodLabelData={enrollments.filter(item=>!item.isTrainee&&matchesAnalysisScope(item)&&matchesBaseScope(item))} scope={`${whatsappScope} · ${includeSecondOption?'1ª + 2ª opção':'1ª opção'}`} asOf={rangeEndAt} period={coursePeriod} onPeriodChange={setCoursePeriod} statusFiltered={Boolean(statusFilter)} includeSecondOption={includeSecondOption}/>:analysisTab==='reports'?<EnrollmentReports snapshots={visibleSnapshotSeries.map(snapshot=>({...snapshot,enrollments:snapshot.enrollments.filter(matchesActiveScope)}))} scope={`${scopeSummary} · ${enrollmentScope}`} statusFiltered={Boolean(statusFilter)}/>:<div className="regional-table analysis-regional-table">
 <div className="regional-head">
 {performanceHeaders.map(([key,label])=>{const active=performanceSort.key===key;return <button type="button" className={`regional-sort${active?' active':''}`} key={key} onClick={()=>togglePerformanceSort(key)} aria-label={`Ordenar por ${label}${active?`, ordem ${performanceSort.direction==='asc'?'crescente':'decrescente'}`:''}`}><span>{label}</span>{active&&<i className="regional-sort-arrow" aria-hidden="true">{performanceSort.direction==='asc'?'▲':'▼'}</i>}</button>})}
 </div>{sortedPerformanceRows.map(row=>

@@ -120,6 +120,17 @@ body, .app-shell { background: var(--cps-bg); color: var(--cps-text); }
 .analysis-scope label { display: inline-flex; align-items: center; gap: 5px; min-height: 30px; color: var(--cps-surface); font-size: 12px; font-weight: 700; white-space: nowrap; cursor: pointer; }
 .analysis-scope input { width: 15px; height: 15px; margin: 0; accent-color: var(--cps-cyan); }
 .analysis-scope input:focus-visible { outline: 2px solid var(--cps-cyan-light); outline-offset: 2px; }
+.second-option-toggle:has(input:disabled) { opacity: .65; cursor: default; }
+.scope-row:has(.second-option-note), .scope-row:has(.dashboard-loading) { flex-wrap: wrap; row-gap: 6px; }
+.second-option-note { flex-basis: 100%; margin: 0; color: var(--cps-text-secondary); font-size: 12px; line-height: 1.5; }
+.history-loading { display: flex; flex: 1; flex-direction: column; justify-content: center; align-items: center; gap: 8px; padding: 24px; color: var(--cps-text-secondary); text-align: center; }
+.history-loading strong { color: var(--cps-blue); font-size: 16px; }
+.history-loading span, .history-loading p, .dashboard-loading { font-size: 13px; line-height: 1.5; }
+.history-loading p { margin: 0; }
+.history-loading button, .dashboard-loading button { border: 1px solid var(--cps-border); border-radius: 6px; padding: 9px 13px; color: var(--cps-blue); background: var(--cps-surface); cursor: pointer; }
+.dashboard-loading button { margin-left: 10px; }
+.dashboard-loading { flex-basis: 100%; margin: 0; }
+.dashboard-refresh-notice { flex-basis: 100%; margin: 0; color: var(--cps-text-secondary); font-size: 12px; line-height: 1.5; }
 .header-tools { display: contents; }
 .mobile-menu-toggle { display: none; }
 .mobile-menu-filters { display: none; }
@@ -194,6 +205,12 @@ body, .app-shell { background: var(--cps-bg); color: var(--cps-text); }
 .chart-history-legend .legend-paid::before { border-top-color: var(--cps-blue); }
 .chart-total-line { stroke: var(--cps-cyan); stroke-width: 3; }
 .chart-paid-line { stroke: var(--cps-blue); stroke-width: 2.5; }
+.history-chart-error { margin: 0 14px 8px; color: var(--cps-text-secondary); font-size: 12px; text-align: center; }
+.history-chart-error button { margin-left: 6px; border: 1px solid var(--cps-border); border-radius: 5px; padding: 4px 8px; color: var(--cps-blue); background: var(--cps-surface); cursor: pointer; }
+.map-loading { width: 100%; height: 100%; min-height: 280px; background: linear-gradient(100deg, transparent 20%, rgba(20, 181, 210, .1) 40%, rgba(20, 181, 210, .1) 60%, transparent 80%), var(--cps-bg); background-size: 220% 100%; animation: map-loading-sweep 1.2s linear infinite; }
+.map-preview { display: grid; place-items: center; background: var(--cps-bg); animation: none; }
+.map-preview img { width: 100%; height: 100%; min-height: 280px; object-fit: contain; }
+@keyframes map-loading-sweep { to { background-position-x: -220%; } }
 .chart-total-dot { fill: var(--cps-surface); stroke: var(--cps-cyan); }
 .chart-paid-dot { fill: var(--cps-blue); }
 .chart-date { font-weight: 700; }
@@ -444,8 +461,9 @@ footer {
 .course-bar-value { position: absolute; z-index: 2; pointer-events: none; white-space: nowrap; }
 .course-bar-value.inside { top: 50%; color: var(--cps-surface); font-size: 10px; font-weight: 800; line-height: 1; text-shadow: 0 1px 1px rgba(0, 40, 48, .25); transform: translate(-50%, -50%); }
 .course-bar-value.inside.pending { font-size: 9px; font-weight: 700; }
-.course-bar-value.demand { top: 50%; margin-left: 8px; color: var(--cps-text-secondary); font-size: 10px; font-weight: 700; line-height: 1; transform: translateY(-50%); }
+.course-bar-value.demand { top: 50%; display: inline-flex; align-items: baseline; gap: 3px; margin-left: 8px; color: var(--cps-text-secondary); font-size: 10px; font-weight: 700; line-height: 1; transform: translateY(-50%); }
 .course-bar-value.compact { top: 50%; display: inline-flex; align-items: baseline; gap: 3px; line-height: 1; transform: translate(8px, -50%); }
+.course-second-option-count { color: var(--cps-cyan-dark, var(--cps-blue-dark)); font-size: 9px; font-style: normal; font-weight: 700; }
 .course-bar-value.compact b { color: var(--cps-blue); font-size: 10px; font-weight: 800; }
 .course-bar-value.compact small { color: var(--cps-cyan); font-size: 9px; font-weight: 700; }
 .course-bar-value.compact em { color: var(--cps-text-secondary); font-size: 10px; font-style: normal; font-weight: 700; }
@@ -809,3 +827,20 @@ footer::before { display: none !important; content: none !important; }
   .chart-history-toolbar { grid-template-columns: minmax(0, 1fr); gap: 7px; }
   .chart-history-series, .chart-daily-paid-action, .chart-history-frequency { grid-column: 1; justify-self: center; }
 }
+
+
+.chart-loading-placeholder { display: grid; flex: 1; min-height: 0; place-content: center; justify-items: center; gap: 10px; color: var(--cps-text-secondary); font-size: 13px; text-align: center; }
+.evolution-panel .trend.chart-loading-placeholder { grid-template-rows: none; grid-auto-rows: max-content; align-content: center; justify-content: center; }
+.chart-loading-track { width: min(280px, 65vw); height: 12px; overflow: hidden; border-radius: 999px; background: var(--cps-border); }
+.chart-loading-track i { display: block; height: 100%; border-radius: inherit; background: var(--cps-cyan); transition: width 180ms ease-out; }
+.chart-loading-placeholder strong { color: var(--cps-blue); font-size: 12px; }
+@media (prefers-reduced-motion: reduce) { .chart-loading-track i { transition: none; } }
+
+.map-heat-container { position: relative; }
+.map-stage { display: flex; flex: 1; width: 100%; min-width: 0; min-height: 0; opacity: 0; visibility: hidden; transform: translateY(8px) scale(.992); transition: opacity 460ms ease, transform 460ms cubic-bezier(.2,.75,.25,1), visibility 0s linear 460ms; }
+.map-stage.is-ready { opacity: 1; visibility: visible; transform: none; transition-delay: 0s; }
+.map-stage > .ared-map { flex: 1; width: 100%; height: 100%; min-height: 0; }
+.map-loading-message { position: absolute; z-index: 2; inset: 0; display: grid; place-items: center; width: 100%; height: auto; min-height: 0; color: var(--cps-text-secondary); background: var(--cps-bg); font-size: 13px; animation: none; }
+.chart-content-enter { animation: chart-content-enter 520ms cubic-bezier(.2,.75,.25,1) both; }
+@keyframes chart-content-enter { from { opacity: 0; transform: translateY(10px) scale(.995); } to { opacity: 1; transform: translateY(0) scale(1); } }
+@media (prefers-reduced-motion: reduce) { .map-stage, .map-stage.is-ready { transition: none; transform: none; } .chart-content-enter { animation: none; } }

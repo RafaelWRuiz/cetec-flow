@@ -17,6 +17,8 @@ export type SourceOffer = {
   vagas: number
   pagos: number
   nao_pagos: number
+  segunda_opcao_pagos: number | null
+  segunda_opcao_nao_pagos: number | null
   total_inscritos: number
   demanda_original: number | null
   demanda_calculada: number
@@ -35,3 +37,4 @@ export type EnrollmentSnapshot = {
 }
 
 export function parseInscricoes(html: string, source?: string): EnrollmentSnapshot
+export function parseInscricoesXlsx(file: Buffer, source?: string): Promise<EnrollmentSnapshot>
