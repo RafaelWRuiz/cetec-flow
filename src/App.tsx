@@ -4,7 +4,7 @@ import RegionalMapPreview from './components/RegionalMapPreview'
 import { REGIONAL_BY_MUNICIPALITY, REGIONAL_NAMES } from './data/regionalLookup'
 import { shortenCourseForWhatsApp } from './data/courseWhatsAppAliases'
 import type { Enrollment, EtecPoint, SnapshotSeries } from './data/mockData'
-import { hasSecondOption, secondOptionSeries } from './lib/secondOption'
+import { secondOptionSeries } from './lib/secondOption'
 import { fetchDashboard, loadDashboardHistory, readLatestDashboardCache } from './lib/dashboardLoading'
 
 type Filters={regional:string[];city:string[];etec:string[];axis:string[];offerType:string[];course:string[];period:string[]}; type FilterKey=keyof Filters
@@ -280,7 +280,6 @@ function RankTable({rows,etecs,direction,onToggleDirection,regionalFor}:RankTabl
  </div>
 }
 export default function App(){
- const [considerSecondOption,setConsiderSecondOption]=useState(false)
  const [historyState,setHistoryState]=useState<{phase:'loading'|'ready'|'error';message:string}>({phase:'loading',message:''})
  const [historyDates,setHistoryDates]=useState<string[]>([])
  const [historyPreview,setHistoryPreview]=useState<SnapshotSeries[]>([])
@@ -320,8 +319,7 @@ export default function App(){
   return()=>controller.abort()
  },[historyAttempt])
  const {etecs,snapshotSeries}=dashboard??{etecs:[],snapshotSeries:[]}; const rangeStartAt=snapshotSeries.at(0)?.referenceAt||''; const rangeEndAt=snapshotEndAt||snapshotSeries.at(-1)?.referenceAt||''; const sourceSnapshotSeries=snapshotSeries.filter(snapshot=>snapshot.referenceAt>=rangeStartAt&&snapshot.referenceAt<=rangeEndAt)
- const secondOptionAvailable=hasSecondOption(sourceSnapshotSeries.at(-1)?.enrollments??[])
- const includeSecondOption=considerSecondOption&&secondOptionAvailable
+ const includeSecondOption=false
  const visibleSnapshotSeries=includeSecondOption?secondOptionSeries(sourceSnapshotSeries):sourceSnapshotSeries
  const selectedSnapshot=visibleSnapshotSeries.at(-1)??snapshotSeries.at(-1); const enrollments=selectedSnapshot?.enrollments??[]
  const isEadOffer=(item:Enrollment)=>/\bEAD\b/i.test(item.course)||normalizeName(item.period).includes('ead')||normalizeName(item.period)==='on-line'; const matchesAnalysisScope=(item:Enrollment)=>item.isTrainee?analysisScope.trainees:isEadOffer(item)?analysisScope.ead:analysisScope.presential
@@ -374,7 +372,7 @@ export default function App(){
 <span className="analysis-scope-title">Recorte</span>
 <div className="analysis-scope-options">
 <label><input type="checkbox" checked={analysisScope.presential} onChange={event=>setAnalysisScope(current=>({...current,presential:event.target.checked}))}/><span>Presencial</span></label>
-<label className="second-option-toggle" title={secondOptionAvailable?'Soma pagos e não pagos da 1ª e da 2ª opção, mantendo as vagas.':'Esta importação não tem dados de 2ª opção. Importe a nova planilha para habilitar.'}><input type="checkbox" checked={includeSecondOption} disabled={!secondOptionAvailable} onChange={event=>setConsiderSecondOption(event.target.checked)}/><span>2° Opção</span></label>
+<label className="second-option-toggle" title="Temporariamente desabilitado."><input type="checkbox" checked={includeSecondOption} disabled/><span>2° Opção</span></label>
 {([['ead','EAD'],['trainees','Treineiros']] as const).map(([key,label])=><label key={key}><input type="checkbox" checked={analysisScope[key]} onChange={event=>setAnalysisScope(current=>({...current,[key]:event.target.checked}))}/><span>{label}</span></label>)}
 </div>
 </div>
