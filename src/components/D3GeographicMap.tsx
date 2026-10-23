@@ -588,10 +588,11 @@ export default function D3GeographicMap({ etecs, selected, visible, selectedRegi
       const targetX = railStart[0] + (railEnd[0] - railStart[0]) * label.railPosition
       const targetY = railStart[1] + (railEnd[1] - railStart[1]) * label.railPosition + 10
       const outsideMainland = (x: number, y: number) => {
-        for (let sampleX = x; sampleX <= x + textWidth; sampleX += 8) {
-          for (let index = 0; index < lines.length; index += 1) {
-            const baseline = y + (index - (lines.length - 1) / 2) * 11
-            for (const sampleY of [baseline - 8, baseline - 4, baseline + 1]) {
+        for (let index = 0; index < lines.length; index += 1) {
+          const lineWidth = Math.min(textWidth, lines[index].length * 5.6)
+          const baseline = y + (index - (lines.length - 1) / 2) * 11
+          for (const sampleX of [x + 1, x + lineWidth / 2, x + lineWidth - 1]) {
+            for (const sampleY of [baseline - 6, baseline, baseline + 2]) {
               const geographicPoint = projection.invert?.([sampleX, sampleY])
               if (!geographicPoint || d3.geoContains(SP_BORDER as d3.ExtendedFeature, geographicPoint)) return false
             }
@@ -599,26 +600,17 @@ export default function D3GeographicMap({ etecs, selected, visible, selectedRegi
         }
         return true
       }
-      let best: { x: number; y: number; score: number } | null = null
-      const minX = Math.max(6, targetX - 150)
-      const maxX = Math.min(width - textWidth - 6, targetX + 150)
-      const minY = Math.max(12, targetY - 35)
-      const maxY = Math.min(height - 5, targetY + 75)
-      for (let y = minY; y <= maxY; y += 3) {
-        for (let x = minX; x <= maxX; x += 3) {
-          const box = { left: x, right: x + textWidth, top: y - textHeight / 2 - 2, bottom: y + textHeight / 2 + 2 }
-          if (placedRegionalLabelBoxes.some((placed) => box.left < placed.right + 4 && box.right > placed.left - 4 && box.top < placed.bottom + 4 && box.bottom > placed.top - 4)) continue
-          if (!outsideMainland(x, y)) continue
-          const dx = x - targetX
-          const dy = y - targetY
-          const score = dx * dx + dy * dy * 2
-          if (!best || score < best.score) best = { x, y, score }
-        }
-      }
-      if (best) {
-        regionalLabelPlacements[regional] = { x: best.x, y: best.y, lines }
-        placedRegionalLabelBoxes.push({ left: best.x, right: best.x + textWidth, top: best.y - textHeight / 2 - 2, bottom: best.y + textHeight / 2 + 2 })
-      }
+      const offsets: Array<[number, number]> = [[0, 0], [0, 8], [0, 16], [0, 24], [0, 32], [8, 8], [-8, 8], [8, 16], [-8, 16], [0, 40], [0, 48], [16, 16], [-16, 16]]
+      const candidates = offsets.map(([dx, dy]) => ({
+        x: Math.max(6, Math.min(width - textWidth - 6, targetX + dx)),
+        y: Math.max(12 + textHeight / 2, Math.min(height - textHeight / 2 - 5, targetY + dy)),
+      })).sort((left, right) => (left.x - targetX) ** 2 + (left.y - targetY) ** 2 * 2 - ((right.x - targetX) ** 2 + (right.y - targetY) ** 2 * 2))
+      const position = candidates.find(({ x, y }) => {
+        const box = { left: x, right: x + textWidth, top: y - textHeight / 2 - 2, bottom: y + textHeight / 2 + 2 }
+        return !placedRegionalLabelBoxes.some((placed) => box.left < placed.right + 4 && box.right > placed.left - 4 && box.top < placed.bottom + 4 && box.bottom > placed.top - 4) && outsideMainland(x, y)
+      }) ?? candidates[0]
+      regionalLabelPlacements[regional] = { ...position, lines }
+      placedRegionalLabelBoxes.push({ left: position.x, right: position.x + textWidth, top: position.y - textHeight / 2 - 2, bottom: position.y + textHeight / 2 + 2 })
     })
     mergedRegionalFeatures.forEach((feature) => {
       const regional = String(feature.properties.regional ?? '')
