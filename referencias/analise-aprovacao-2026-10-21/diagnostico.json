@@ -1,0 +1,43 @@
+{
+  "scope": "sample of prior semester; do not assume counts or status match the new edition",
+  "summary": {
+    "source_name": "Aprovação de cursos 1ª fase.xlsx",
+    "source_sha256": "250e1eb276ec702d1057fbb14568447d765c9e365d8a517762648d436624fcea",
+    "sheets": [
+      {
+        "name": "Plan1",
+        "rows": 13158,
+        "columns": 12
+      }
+    ],
+    "header_row": 9,
+    "headers": [
+      "Aprovado",
+      "Município",
+      "Unidade",
+      "Curso",
+      "Período",
+      "Vagas",
+      "Inscritos",
+      "Demanda",
+      "2ª opção vindo de outras turmas",
+      "Inscritos",
+      "2ª opção indo para outras turmas",
+      "Inscritos"
+    ],
+    "historical_offer_rows": 754,
+    "historical_incoming_relation_rows": 9381,
+    "historical_outgoing_relation_rows": 10326,
+    "approval_cells_populated_in_sample": 0,
+    "mixed_seat_and_label_rows_in_sample": 3,
+    "internal_pairs_reconciling_in_both_views_in_sample": 8658,
+    "internal_pair_disagreements_in_sample": 0,
+    "pair_rows_missing_from_incoming_view_in_sample": 0,
+    "pair_rows_missing_from_outgoing_view_in_sample": 0,
+    "external_incoming_rows_in_sample": 723,
+    "external_outgoing_rows_in_sample": 1668,
+    "formulas_in_sample": 0,
+    "invalid_rows_in_sample": 0,
+    "merged_ranges_in_sample": 0
+  }
+}
