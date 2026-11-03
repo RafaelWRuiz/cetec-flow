@@ -364,7 +364,7 @@ export default function App(){
 <p>Acompanhamento das Inscrições</p>
 </div>
 <span className="brand-deadline-divider" aria-hidden="true"/>
-<div className="brand-deadlines"><span>INSCRIÇÕES ATÉ 3/11</span><span>PROVA 6/12</span></div>
+<div className="brand-deadlines"><span>INSCRIÇÕES ATÉ 10/11</span><span>PROVA 6/12</span></div>
 </div>
 <div className="header-tools">
 <button className="mobile-menu-toggle" type="button" aria-label={mobileMenuOpen?'Fechar menu':'Abrir menu'} aria-expanded={mobileMenuOpen} aria-controls="header-menu" onClick={()=>setMobileMenuOpen(current=>!current)}><i aria-hidden="true"/><i aria-hidden="true"/><i aria-hidden="true"/></button>
