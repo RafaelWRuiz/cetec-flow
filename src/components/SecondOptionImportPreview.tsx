@@ -164,7 +164,7 @@ export default function SecondOptionImportPreview() {
               <div className="sim-import-section-heading">
                 <div>
                   <p className="sim-preview-eyebrow">Amostra</p>
-                  <h3 id="sim-import-sample-title">Primeiras {report.offers.length} turmas</h3>
+                  <h3 id="sim-import-sample-title">Primeiras {Math.min(report.offers.length, 8)} turmas</h3>
                 </div>
                 <span>Prévia resumida</span>
               </div>
@@ -172,7 +172,7 @@ export default function SecondOptionImportPreview() {
                 <span>Turma e curso</span><span>Inscritos / vagas</span><span>Demanda</span><span>2ª opção recebida</span><span>2ª opção indicada</span>
               </div>
               <div className="sim-import-offer-list">
-                {report.offers.map((offer, index) => (
+                {report.offers.slice(0, 8).map((offer, index) => (
                   <article className="sim-import-offer-row" key={`${offer.id}-${index}`}>
                     <div className="sim-import-offer-name">
                       <strong>{offer.course || 'Curso sem descrição'}</strong>

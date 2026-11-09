@@ -39,6 +39,7 @@ export type SecondOptionImportReport = {
   blankOutgoingLists: number
   unparsedEntries: number
   offers: ImportedOfferPreview[]
+  links: { sourceTurmaId: string; destinationTurmaId: string; applicantCount: number }[]
   checks: ImportCheck[]
 }
 
@@ -396,7 +397,18 @@ export async function analyzeSecondOptionFile(file: File): Promise<SecondOptionI
     ...(unparsedEntries ? [{ status: 'warning' as const, title: 'Leitura das listas', detail: `${unparsedEntries} ocorrências de “Turma” não seguiram o padrão turma + inscritos e precisam de revisão.`, examples: unparsedExamples }] : []),
   ]
 
-  const offers: ImportedOfferPreview[] = sourceRows.slice(0, 8).map((offer) => ({
+  const links = Array.from(outgoing.entries())
+    .filter(([key, count]) => {
+      const [origin, destination] = key.split('>')
+      return count > 0 && offerIds.has(origin) && offerIds.has(destination)
+        && outgoing.get(key) === incoming.get(key)
+    })
+    .map(([key, applicantCount]) => {
+      const [sourceTurmaId, destinationTurmaId] = key.split('>')
+      return { sourceTurmaId, destinationTurmaId, applicantCount }
+    })
+
+  const offers: ImportedOfferPreview[] = sourceRows.map((offer) => ({
     id: offer.id || 'Sem ID',
     municipality: offer.municipality,
     unit: offer.unit,
@@ -428,6 +440,7 @@ export async function analyzeSecondOptionFile(file: File): Promise<SecondOptionI
     blankOutgoingLists,
     unparsedEntries,
     offers,
+    links,
     checks,
   }
 }
