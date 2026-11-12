@@ -11,9 +11,9 @@ const ratio = (paid: number, vacancies: number) => vacancies ? `${decimal.format
 const weekday = (value: string) => new Intl.DateTimeFormat('en-US', { timeZone: 'America/Sao_Paulo', weekday: 'short' }).format(new Date(value))
 const percentage = (value: number | null) => value === null ? 'N/A' : `${value > 0 ? '+' : ''}${decimal.format(value)}%`
 
-type Props = { snapshots: SnapshotSeries[]; scope: string; statusFiltered: boolean }
+type Props = { snapshots: SnapshotSeries[]; scope: string; statusFiltered: boolean; includeSecondOption: boolean }
 
-export default function EnrollmentReports({ snapshots, scope, statusFiltered }: Props) {
+export default function EnrollmentReports({ snapshots, scope, statusFiltered, includeSecondOption }: Props) {
   const [expanded, setExpanded] = useState(false)
   const dialog = useRef<HTMLDialogElement>(null)
   const expandButton = useRef<HTMLButtonElement>(null)
@@ -41,6 +41,7 @@ export default function EnrollmentReports({ snapshots, scope, statusFiltered }: 
         <button ref={expandButton} type="button" onClick={() => setExpanded(true)} aria-haspopup="dialog">Expandir ↗</button>}
     </div>
     <p className="reports-scope">{scope}</p>
+    {includeSecondOption && <p className="reports-note">Histórico da 1ª opção; 2ª opção é estimativa.</p>}
     {!ordered.length ? <p className="reports-note">Nenhuma importação disponível. Importe uma planilha para iniciar o histórico.</p> : <>
       <p className="reports-note">Última importação de cada dia, no horário de Brasília. A tabela combina o valor acumulado e a evolução em relação ao dia anterior disponível. Demanda efetiva = pagos regulares ÷ vagas regulares.</p>
       <div className="reports-weekend-legend" aria-label="Legenda dos dias do fim de semana"><span><i className="reports-day-swatch reports-day-saturday" aria-hidden="true"/>Sábado</span><span><i className="reports-day-swatch reports-day-sunday" aria-hidden="true"/>Domingo</span></div>
