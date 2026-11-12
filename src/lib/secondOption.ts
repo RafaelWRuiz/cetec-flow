@@ -18,11 +18,6 @@ function destinationRelation(source: MatchedSecondOptionOffer, destination: Matc
     : { label: 'Outro eixo ou eixo não identificado', factor: 0.6 }
 }
 
-function roundEstimatedCandidates(value: number) {
-  const whole = Math.floor(value)
-  return whole + (value - whole > 0.4 ? 1 : 0)
-}
-
 export function isSecondOptionLinkAllowed(source: MatchedSecondOptionOffer, destination: MatchedSecondOptionOffer) {
   return normalize(destination.offer.municipality) !== sameCityOnlyDestination
     || normalize(source.offer.municipality) === sameCityOnlyDestination
@@ -76,7 +71,8 @@ export function eligibleSecondOptionContributions(matched: Map<string, MatchedSe
     const surplusPaid = Math.max(0, source.enrollment.paid - source.enrollment.vacancies)
     const proportion = surplusPaid / source.enrollment.paid
     const { label: relation, factor } = destinationRelation(source, destination)
-    contributions.push({ source, destination, linkCount: link.applicant_count, surplusPaid, proportion, relation, factor, potential: link.applicant_count * proportion * factor })
+    const potential = Math.floor(link.applicant_count * proportion * factor)
+    contributions.push({ source, destination, linkCount: link.applicant_count, surplusPaid, proportion, relation, factor, potential })
   }
   return contributions
 }
@@ -86,7 +82,7 @@ export function guaranteedSourceSupport(matched: Map<string, MatchedSecondOption
   for (const { destination, potential } of eligibleSecondOptionContributions(matched, links)) {
     support.set(destination.offer.id, (support.get(destination.offer.id) ?? 0) + potential)
   }
-  return new Map([...support].map(([offerId, potential]) => [offerId, roundEstimatedCandidates(potential)]))
+  return support
 }
 
 export function secondOptionSeries(snapshots: SnapshotSeries[], etecs: EtecPoint[], offers: SecondOptionOffer[], links: SecondOptionLink[]): SnapshotSeries[] {
@@ -108,3 +104,4 @@ export function secondOptionSeries(snapshots: SnapshotSeries[], etecs: EtecPoint
     }
   })
 }
+
