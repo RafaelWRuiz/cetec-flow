@@ -521,6 +521,13 @@ footer {
 .course-chart-paid::before { background: var(--cps-blue); }
 .course-chart-potential::before { background: var(--cps-violet); }
 .course-chart-unpaid::before { background: var(--cps-cyan); }
+.course-chart-offer-sort { display: inline-flex; align-items: center; gap: 4px; border: 0; border-radius: 3px; padding: 0; color: color-mix(in srgb, var(--cps-attention) 70%, var(--cps-text)); background: transparent; font: inherit; cursor: pointer; }
+.course-chart-offer-sort:hover, .course-chart-offer-sort.active { color: var(--cps-text); }
+.course-chart-offer-sort:focus-visible { outline: 2px solid var(--cps-cyan); outline-offset: 3px; }
+.course-chart-sort-indicator { min-width: 10px; color: inherit; font-size: 13px; line-height: 1; }
+.course-chart-sort-reset { display: inline-grid; width: 16px; height: 16px; place-items: center; border: 0; border-radius: 3px; padding: 0; color: var(--cps-text-secondary); background: transparent; font: inherit; font-size: 14px; font-weight: 700; line-height: 1; cursor: pointer; }
+.course-chart-sort-reset:hover { color: var(--cps-red); }
+.course-chart-sort-reset:focus-visible { outline: 2px solid var(--cps-cyan); outline-offset: 2px; }
 .course-summary-actions { position: absolute; z-index: 5; top: 8px; right: 10px; display: flex; gap: 5px; }
 .course-summary-actions .icon-action { width: 25px; height: 25px; border-color: color-mix(in srgb, var(--cps-blue) 36%, var(--cps-border)); }
 .course-summary-actions .icon-action svg { width: 14px; height: 14px; }
@@ -535,7 +542,9 @@ footer {
 .course-target-label { position: absolute; top: -16px; color: color-mix(in srgb, var(--cps-green) 72%, var(--cps-text)); font-size: 11px; white-space: nowrap; transform: translateX(-50%); }
 .course-row { position: relative; z-index: 1; display: grid; grid-template-columns: var(--course-label-width) minmax(0, 1fr); align-items: center; min-height: 30px; gap: var(--course-row-gap); border: 0; padding: 0; color: inherit; background: transparent; text-align: left; }
 .course-row.is-active { z-index: 3; }
-.course-row-label { display: -webkit-box; overflow: hidden; color: var(--cps-text); font-size: 12px; line-height: 1.25; text-align: right; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.course-row-label-wrap { display: flex; min-width: 0; align-items: center; justify-content: flex-end; gap: 6px; }
+.course-row-label { display: -webkit-box; min-width: 0; flex: 1; overflow: hidden; color: var(--cps-text); font-size: 12px; line-height: 1.25; text-align: right; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.course-row-offer-count { flex: none; padding: 0; color: color-mix(in srgb, var(--cps-attention) 70%, var(--cps-text)); font-size: 11px; font-variant-numeric: tabular-nums; font-weight: 700; line-height: 1.2; }
 .course-row-track { position: relative; display: block; height: 30px; overflow: visible; border-radius: 0 4px 4px 0; }
 .course-row-track i { position: absolute; top: 0; bottom: 0; display: block; }
 .course-row-paid { border-radius: 0 2px 2px 0; background: var(--cps-blue); }

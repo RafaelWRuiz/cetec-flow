@@ -182,7 +182,11 @@ function TrendChart({data,target,loading,cycle}:{data:ChartData;target:number;lo
 </div>
 }
 function CourseChart({rows,summaryData,periodLabelData,scope,asOf,period,onPeriodChange,statusFiltered,includeSecondOption}:{rows:CourseChartRow[];summaryData:Enrollment[];periodLabelData:Enrollment[];scope:string;asOf:string;period:CoursePeriod;onPeriodChange:(period:CoursePeriod)=>void;statusFiltered:boolean;includeSecondOption:boolean}){
- const orderedRows=[...rows].sort((a,b)=>(((b.paid+(includeSecondOption?b.secondOptionPaid:0))/Math.max(b.vacancies,1))-((a.paid+(includeSecondOption?a.secondOptionPaid:0))/Math.max(a.vacancies,1)))||(b.paid+(includeSecondOption?b.secondOptionPaid:0))-(a.paid+(includeSecondOption?a.secondOptionPaid:0))||a.course.localeCompare(b.course,'pt-BR'))
+ const [courseSort,setCourseSort]=useState<'demand'|'offers-desc'|'offers-asc'>('demand')
+ const orderedRows=[...rows].sort((a,b)=>{const demandA=(a.paid+(includeSecondOption?a.secondOptionPaid:0))/Math.max(a.vacancies,1);const demandB=(b.paid+(includeSecondOption?b.secondOptionPaid:0))/Math.max(b.vacancies,1);if(courseSort==='offers-desc')return b.offerCount-a.offerCount||demandB-demandA||a.course.localeCompare(b.course,'pt-BR');if(courseSort==='offers-asc')return a.offerCount-b.offerCount||demandB-demandA||a.course.localeCompare(b.course,'pt-BR');return demandB-demandA||(b.paid+(includeSecondOption?b.secondOptionPaid:0))-(a.paid+(includeSecondOption?a.secondOptionPaid:0))||a.course.localeCompare(b.course,'pt-BR')})
+  const toggleCourseSort=()=>setCourseSort(current=>current==='demand'||current==='offers-asc'?'offers-desc':'offers-asc')
+  const resetCourseSort=()=>setCourseSort('demand')
+  const courseSortLabel=courseSort==='demand'?'Ordenação inicial por demanda. Clique para ordenar por número de turmas, da maior para a menor.':courseSort==='offers-desc'?'Ordenado por número de turmas, da maior para a menor. Clique para inverter a ordem.':'Ordenado por número de turmas, da menor para a maior. Clique para inverter a ordem.'
  const rowKey=(row:CourseChartRow)=>`${row.course}\u0000${row.period}`
  const periodsByCourse=new Map<string,Set<string>>()
  periodLabelData.forEach(item=>{const periods=periodsByCourse.get(item.course)??new Set<string>();periods.add(item.period);periodsByCourse.set(item.course,periods)})
@@ -213,11 +217,13 @@ function CourseChart({rows,summaryData,periodLabelData,scope,asOf,period,onPerio
  return <div className={`course-chart${statusFiltered?' has-status-note':''}${includeSecondOption?' has-second-option':''}`}>
 {statusFiltered&&<p className="course-status-note">Filtro de situação: cada turma é classificada por pagos ÷ vagas. O gráfico soma, por curso e período, apenas as turmas selecionadas.</p>}
 <div className="course-plot-shell">
-<div className="course-plot" role="img" aria-label="Demanda por curso, com barras de pagos, não pagos e meta de 1,5 inscritos por vaga">
+<div className="course-plot" role="group" aria-label="Demanda por curso, com barras de pagos, pendentes e meta de 1,5 inscritos por vaga">
 <div className="course-bars-header">
 <span className="course-chart-paid">{includeSecondOption?'Pagos reais':'Pagos'}</span>
 {includeSecondOption&&<span className="course-chart-potential">2ª opção estimada</span>}
 <span className="course-chart-unpaid">Pendentes</span>
+<button type="button" className={`course-chart-offer-sort${courseSort!=='demand'?' active':''}`} aria-label={courseSortLabel} aria-pressed={courseSort!=='demand'} title={courseSortLabel} onClick={toggleCourseSort}><span>Nº de turmas</span><span className="course-chart-sort-indicator" aria-hidden="true">{courseSort==='offers-desc'?'↓':courseSort==='offers-asc'?'↑':'↕'}</span></button>
+{courseSort!=='demand'&&<button type="button" className="course-chart-sort-reset" aria-label="Voltar à ordenação inicial por demanda" title="Voltar à ordenação inicial por demanda" onClick={resetCourseSort}>×</button>}
 </div>
 <div className="course-summary-actions"><button className="icon-action" type="button" onClick={copySummary} aria-label="Copiar resumo" title="Copiar resumo"><ActionIcon name="copy"/></button><span className="sr-only" aria-live="polite">{summaryFeedback}</span></div>
 <div className="course-bars-stage">
@@ -225,7 +231,7 @@ function CourseChart({rows,summaryData,periodLabelData,scope,asOf,period,onPerio
 <div className="course-bars-content">
 <span className="course-target-range" aria-hidden="true"><i className="course-target-line" style={{left:`${targetWidth}%`}}/><span className="course-target-label" style={{left:`${targetWidth}%`}}>Meta 1,5x</span></span>
 {enrichedRows.map((row,index)=>{const paidWidth=Math.min(row.paidDemand/scaleMax*100,100);const totalWidth=Math.min(row.totalDemand/scaleMax*100,100);const key=rowKey(row);const active=activeCourse===key;const tooltipId=`course-tooltip-${index}`;const label=`${chartCourseName(row.course)}${(periodsByCourse.get(row.course)?.size??0)>1?` - ${row.period}`:''}`;return <button type="button" className={`course-row${active?' is-active':''}`} key={key} aria-describedby={active?tooltipId:undefined} onMouseEnter={()=>setActiveCourse(key)} onMouseLeave={()=>setActiveCourse(current=>current===key?'':current)} onFocus={()=>setActiveCourse(key)} onBlur={()=>setActiveCourse(current=>current===key?'':current)} onClick={()=>setActiveCourse(current=>current===key?'':key)}>
-<span className="course-row-label" title={label}>{label}</span>
+<span className="course-row-label-wrap"><span className="course-row-label" title={label}>{label}</span><small className="course-row-offer-count" aria-label={`${row.offerCount} ${row.offerCount===1?'turma':'turmas'}`}>{row.offerCount}</small></span>
 <CourseRowTrack paid={row.paid} unpaid={row.unpaid} secondOptionTotal={includeSecondOption?row.secondOptionPaid+row.secondOptionUnpaid:0} demand={row.paidDemand} paidWidth={paidWidth} totalWidth={totalWidth} includeSecondOption={includeSecondOption}>
 {active&&<span className="course-tooltip" id={tooltipId} role="tooltip" style={{left:`${totalWidth}%`}}>
 <strong>Inscritos reais: {number.format(row.total)}</strong>
